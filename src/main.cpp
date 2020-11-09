@@ -64,7 +64,6 @@ void loop() {
   }
 }
 
-
 inline void dataUpd () {
   if (WLAN.createTCP(HOST_NAME, HOST_PORT)) {
       Serial.print("create tcp ok\r\n");
@@ -74,6 +73,9 @@ inline void dataUpd () {
       jsonToSend += "\"" + String(buf) + "\"";
       jsonToSend += ",\"Latitude\":";
       dtostrf(Lati, 1, 2, buf);
+      jsonToSend += "\"" + String(buf) + "\"";
+      jsonToSend += ",\"Speed\":";
+      dtostrf(Skmph, 1, 2, buf);
       jsonToSend += "\"" + String(buf) + "\"";
       jsonToSend += "}";
 
