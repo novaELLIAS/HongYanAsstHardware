@@ -28,9 +28,11 @@ const String APIKey = "fhAS54e5X8HL5wcaB6ZW74oA3vo=";
 
 inline void getGpsData();
 inline void dataUpd();
+inline void accidentReport();
+inline bool rotateCheck();
 
 
-double Lati, Logi, Alti, Skmph, Smps, Acce;
+double Lati, Logi, Alti, Skmph, Smps, Acce, timeDelta;
 int Year, Month, Day, Hour, Minute, Second, Timer;
 
 char sout[101];
@@ -145,17 +147,26 @@ inline void getGpsData () {
   Serial.print  (" Altitude= ");
   Serial.println(Alti, 6);
 
-  Acce = (gpsData.speed.mps() - Smps) / (double)(millis()-Timer);
+  Acce = (gpsData.speed.mps() - Smps) / (timeDelta=((double)(millis()-Timer)/1000.0));
   Timer = millis();
 
   Skmph = gpsData.speed.kmph();
   Smps  = gpsData.speed.mps();
 
+  if (Skmph>=25.0 && rotateCheck() && Acce>=20.0) accidentReport();
+
   Serial.print  ("Speed: ");
   Serial.print  (Skmph, 2);
   Serial.print  (" Acce: ");
-  Serial.print  (Acce, 2);
-  Serial.println(" kph");
+  Serial.println(Acce, 10);
 
   delay(500);
+}
+
+inline bool rotateCheck () {
+  return false;
+}
+
+inline void accidentReport () {
+  Serial.println ("Accident Report Trigged.");
 }
