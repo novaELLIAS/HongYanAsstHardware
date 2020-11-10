@@ -1,6 +1,14 @@
+/*
+* Ellias K Stuart
+*/
+
 #include <Arduino.h>
 #include <SoftwareSerial.h>
 #include <TinyGPS++.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <MPU6050.h>
+#include "I2Cdev.h"
 #include "ESP8266.h"
 
 #define GPS Serial1
