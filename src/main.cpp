@@ -29,6 +29,12 @@ const String APIKey = "fhAS54e5X8HL5wcaB6ZW74oA3vo=";
 inline void getGpsData();
 inline void dataUpd();
 
+
+double Lati, Logi, Alti, Skmph, Smps, Acce;
+int Year, Month, Day, Hour, Minute, Second, Timer;
+
+char sout[101];
+
 void setup() {
   Serial.begin(9600);
   GPS.begin(9600);
@@ -54,13 +60,10 @@ void setup() {
   ESPWIFI.println("AT+UART_CUR=9600,8,1,0,0");
   ESPWIFI.begin(9600);
 
+  Timer = millis();
+
   Serial.println("setup end\r\n");
 }
-
-double Lati, Logi, Alti, Skmph, Smps;
-int Year, Month, Day, Hour, Minute, Second;
-
-char sout[101];
 
 void loop() {
   //Serial.print  ("GPS available? ");
@@ -142,11 +145,16 @@ inline void getGpsData () {
   Serial.print  (" Altitude= ");
   Serial.println(Alti, 6);
 
+  Acce = (gpsData.speed.mps() - Smps) / (double)(millis()-Timer);
+  Timer = millis();
+
   Skmph = gpsData.speed.kmph();
   Smps  = gpsData.speed.mps();
 
   Serial.print  ("Speed: ");
   Serial.print  (Skmph, 2);
+  Serial.print  (" Acce: ");
+  Serial.print  (Acce, 2);
   Serial.println(" kph");
 
   delay(500);
