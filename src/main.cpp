@@ -8,8 +8,12 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <MPU6050.h>
+#include <LiquidCrystal.h>
+#include <IRremote.h>
 #include "I2Cdev.h"
 #include "ESP8266.h"
+
+//#define IRDEBUG
 
 #define GPS Serial1
 #define SIM Serial2
@@ -19,6 +23,13 @@ SoftwareSerial ESPSOFT(13,12);
 MPU6050 accelgyro;
 TinyGPSPlus gpsData;
 ESP8266 WLAN(ESPSOFT);
+
+const int rs = 23, en = 22, d4 = 27, d5 = 26, d6 = 25, d7 = 24;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
+const int RECV_PIN = 11;
+IRrecv irrecv(RECV_PIN);
+decode_results results;
 
 #define SSID "ELLIAS"
 #define PASSWORD "Akimihomura!"
@@ -32,48 +43,80 @@ inline void dataUpd();
 inline void accidentReport();
 inline void accelgyroSetUp();
 inline bool rotateCheck();
+inline int lcd_rm_encode(long long);
+inline int nowPosiModify(long long);
 
 
 double Lati, Logi, Alti, Skmph, Smps, Acce, timeDelta;
-int Year, Month, Day, Hour, Minute, Second, Timer;
+int Year, Month, Day, Hour, Minute, Second, Timer, nowPosi;
 
 char sout[101];
 
 void setup() {
+  lcd.begin(16, 2);
+  lcd.setCursor(0, 0);
+  lcd.print("Initializing...");
+  lcd.setCursor(0, 1);
+
   Serial.begin(9600);
   GPS.begin(9600);
   ESPWIFI.begin(115200);
   SIM.begin(9600);
+
+  lcd.print("[#");
+  lcd.setCursor(10, 1);
+  lcd.print("]");
+  lcd.setCursor(1, 1);
+
   SIM.println("AT+CMGF=1");
+
+  lcd.print("#");
 
   Serial.print("setup begin\r\n");
   Serial.print("FW Version: ");
   Serial.println(WLAN.getVersion().c_str());
+
+  lcd.print("#");
+
   if (WLAN.setOprToStation()) {
     Serial.print("to station ok\r\n");
   } else {
     Serial.print("to station err\r\n");
-  }
+  } lcd.print("#");
   if (WLAN.joinAP(SSID, PASSWORD)) {
     Serial.print("Join AP success\r\n");
     Serial.print("IP: ");
     Serial.println(WLAN.getLocalIP().c_str());
   } else {
     Serial.print("Join AP failure\r\n");
-  }
+  } lcd.print("#");
   ESPWIFI.println("AT+UART_CUR=9600,8,1,0,0");
   ESPWIFI.begin(9600);
 
-  Timer = millis();
+  lcd.print("#");
 
-  accelgyroSetUp();
+  Timer = millis(); lcd.print("#");
 
-  Serial.println("setup end\r\n");
+  accelgyroSetUp(); lcd.print("#");
+
+  irrecv.enableIRIn(); lcd.print("#");
+
+  Serial.println("setup end\r\n"); lcd.print("#] OK.");
 }
 
 void loop() {
-  //Serial.print  ("GPS available? ");
-  //Serial.println(GPS.available());
+
+  #ifdef IRDEBUG
+
+  if (irrecv.decode(&results)) {
+    lcd.clear(); lcd.setCursor(0, 0);
+    Serial.println(results.value, HEX);
+    lcd.print(results.value, HEX);
+    irrecv.resume();
+  }
+
+  #endif
+
   while (GPS.available()) {
     if (gpsData.encode(GPS.read())) {
       getGpsData(); dataUpd();
@@ -250,4 +293,37 @@ inline bool rotateCheck () {
   Serial.println();
 
   return false;
+}
+
+inline int nowPosiModify (long long res) {
+  register int ret=0;
+  if (ret=lcd_rm_encode(res) <= 1000) return ret;
+  else {
+    switch (ret) {
+      case 1001: return (ret+1)%10;
+      case 1002: return --ret<0? ret+10:ret;
+    }
+  }
+}
+
+inline int lcd_rm_encode (long long res) {
+  switch (res) {
+    case 0xFF6897: return 0;
+    //Show Time
+    case 0xFF30CF: return 1;
+    //Show Longitude & Latitude
+    case 0xFF18E7: return 2;
+    //Show Speed
+    case 0xFF7A85: return 3;
+    //Show Acceleration
+    case 0xFF10EF: return 4;
+    //Show Accelgyro
+    case 0xFF38C7: return 5;
+    case 0xFF5AA5: return 6;
+    case 0xFF42BD: return 7;
+    case 0xFF4AB5: return 8;
+    case 0xFF52AD: return 9;
+    case 0xFF22DD: return 1001;
+    case 0xFF02FD: return 1002;
+  }
 }
