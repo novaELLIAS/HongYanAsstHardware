@@ -9,14 +9,21 @@
 #include <Wire.h>
 #include <MPU6050.h>
 #include <LiquidCrystal.h>
+#include <avr/sleep.h>
+#include <avr/power.h>
 #include <IRremote.h>
 #include "I2Cdev.h"
 #include "ESP8266.h"
 
 //#define IRDEBUG
 #define DEBUG
-//#define ACCELGYRO_SERIAL_OUTPUT
+//#define INTERRUPT_ENABLED
+#define ACCELGYRO_SERIAL_OUTPUT
+//#define LOCAL_TEST
 //#define GPS_SERIAL_OUTPUT
+
+#define pinInterrupt 2
+#define lcdBackLight 28
 
 #define GPS Serial1
 #define SIM Serial2
@@ -48,10 +55,14 @@ inline void accelgyroSetUp();
 inline bool rotateCheck();
 inline int lcd_rm_encode(long long);
 inline void nowPosiModify(long long);
+void gotoSleep(void);
+inline bool check_motion();
 
+#define abs(x) ((x)<0? (-x):(x))
 
 double Lati, Logi, Alti, Skmph, Smps, Acce, timeDelta;
 int Year, Month, Day, Hour, Minute, Second, Timer;
+long long interTimer;
 
 char sout[101];
 
@@ -70,6 +81,11 @@ void setup() {
   lcd.setCursor(10, 1);
   lcd.print("]");
   lcd.setCursor(1, 1);
+
+  pinMode(pinInterrupt, INPUT);
+  pinMode(lcdBackLight, OUTPUT);
+
+  digitalWrite(lcdBackLight, HIGH);
 
   SIM.println("AT+CMGF=1");
 
@@ -98,7 +114,7 @@ void setup() {
 
   lcd.print("#");
 
-  Timer = millis(); lcd.print("#");
+  interTimer = Timer = millis(); lcd.print("#");
 
   accelgyroSetUp(); lcd.print("#");
 
@@ -122,14 +138,24 @@ void loop() {
 
   while (GPS.available()) {
     if (gpsData.encode(GPS.read())) {
-      getGpsData(); //dataUpd();
+      getGpsData();
+
+      #ifdef LOCAL_TEST
+      dataUpd();
+      #endif
+
       #ifdef DEBUG
-      irrecv.decode(&results);
+      register bool flag=irrecv.decode(&results);
       nowPosiModify(results.value);
-      irrecv.resume();
+      irrecv.resume(); if (flag) interTimer=millis();
       #endif
     }
   }
+
+  #ifdef INTERRUPT_ENABLED
+  if (millis()-interTimer>=10000 && check_motion()) gotoSleep();
+  #endif
+
 }
 
 inline void dataUpd () {
@@ -241,7 +267,7 @@ inline void accidentReport () {
 unsigned long now, lastTime = 0;
 double dt;
 
-int ax, ay, az, gx, gy, gz;
+int16_t ax, ay, az, gx, gy, gz;
 double aax=0, aay=0,aaz=0, agx=0, agy=0, agz=0;
 long axo = 0, ayo = 0, azo = 0, gxo = 0, gyo = 0, gzo = 0;
 
@@ -319,7 +345,7 @@ inline bool rotateCheck () {
   return false;
 }
 
-int ret=-1, rettmp=-1;
+int ret, rettmp=-1;
 bool flag=true;
 const int tot_sta=5;
 
@@ -337,12 +363,18 @@ inline void nowPosiModify (long long res) {
     } else ret=rettmp, flag=true;
   }
 
+  digitalWrite(lcdBackLight, HIGH);
+
   switch (ret) {
     case 0: {
       lcd.clear(); lcd.setCursor(0, 0);
-      lcd.print(Year); lcd.print("/"); lcd.print(Month); lcd.print("/"); lcd.print(Day);
+      lcd.print(Year); lcd.print("/");
+      if (Month<10) lcd.print("0"); lcd.print(Month); lcd.print("/");
+      if (Day  <10) lcd.print("0"); lcd.print(Day);
       lcd.setCursor(0, 1);
-      lcd.print(Hour); lcd.print(":"); lcd.print(Minute); lcd.print(":"); lcd.print(Second);
+      lcd.print(Hour); lcd.print(":");
+      if (Minute<10) lcd.print("0"); lcd.print(Minute); lcd.print(":");
+      if (Second<10) lcd.print("0"); lcd.print(Second);
       break;
     } case 1: {
       lcd.clear(); lcd.setCursor(0, 0);
@@ -399,4 +431,25 @@ inline int lcd_rm_encode (long long res) {
     case 0xFF02FD: return 1002;
     default: return -1;
   }
+}
+
+void interruptFunc (void) {
+  lcd.clear(); digitalWrite(lcdBackLight, HIGH);
+  lcd.print("A  W  A  K  E");
+  detachInterrupt(0);
+}
+
+void gotoSleep (void) {
+  lcd.clear(); lcd.setCursor(0, 0);
+  lcd.print("FALL ASLEEP."); digitalWrite(lcdBackLight, LOW);
+  attachInterrupt(digitalPinToInterrupt(2), interruptFunc, LOW);
+  delay(100); set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  sleep_enable(); sleep_mode(); sleep_disable();
+}
+
+double preagx, preagy, preagz;
+
+inline bool check_motion() {
+  register bool ret=abs(agx-preagx)<=5&&abs(agy-preagy)<=5&&abs(agz-preagz)<=5&&Skmph<=5;
+  if (!ret) interTimer=millis(); preagx=agx; preagy=agy; preagz=agz; return ret;
 }
