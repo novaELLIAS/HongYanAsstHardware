@@ -14,6 +14,7 @@
 #include "ESP8266.h"
 
 //#define IRDEBUG
+#define DEBUG
 
 #define GPS Serial1
 #define SIM Serial2
@@ -44,7 +45,7 @@ inline void accidentReport();
 inline void accelgyroSetUp();
 inline bool rotateCheck();
 inline int lcd_rm_encode(long long);
-inline int nowPosiModify(long long);
+inline void nowPosiModify(long long);
 
 
 double Lati, Logi, Alti, Skmph, Smps, Acce, timeDelta;
@@ -120,6 +121,13 @@ void loop() {
   while (GPS.available()) {
     if (gpsData.encode(GPS.read())) {
       getGpsData(); dataUpd();
+      #ifdef DEBUG
+      if (irrecv.decode(&results)) {
+        lcd.clear(); lcd.setCursor(0, 0);
+        nowPosiModify(results.value);
+        irrecv.resume();
+      }
+      #endif
     }
   }
 }
@@ -295,13 +303,45 @@ inline bool rotateCheck () {
   return false;
 }
 
-inline int nowPosiModify (long long res) {
+inline void nowPosiModify (long long res) {
   register int ret=0;
-  if (ret=lcd_rm_encode(res) <= 1000) return ret;
-  else {
+  if (ret=lcd_rm_encode(res) > 1000) {
     switch (ret) {
-      case 1001: return (ret+1)%10;
-      case 1002: return --ret<0? ret+10:ret;
+      case 1001: ret = (ret+1)%10;
+      case 1002: ret = --ret<0? ret+10:ret;
+    }
+  }
+
+  switch (ret) {
+    case 0: {
+      lcd.clear(); lcd.setCursor(0, 0);
+      lcd.print(Year); lcd.print("/"); lcd.print(Month); lcd.pirnt("/"); lcd.print(Day);
+      lcd.setCursor(1, 0);
+      lcd.print(Hour); lcd.print(":"); lcd.print(Minute); lcd.print(":"); lcd.print(Second);
+      break;
+    } case 1: {
+      lcd.clear(); lcd.setCursor(0, 0);
+      lcd.print("Logi: "); lcd.print(Logi);
+      lcd.setCursor(1, 0);
+      lcd.print("Lati: "); lcd.print(Lati);
+      break;
+    } case 2: {
+      lcd.clear(); lcd.setCursor(0, 0);
+      lcd.print ("Speed(Kmph): ");
+      lcd.setCursor(1, 0); lcd.print(Skmph);
+      break;
+    } case 3: {
+      lcd.clear(); lcd.setCursor(0, 0);
+      lcd.print ("Acceleration:");
+      lcd.setCursor(1, 0); lcd.print(Acce);
+      break;
+    } case 4: {
+      lcd.clear(); lcd.setCursor(0, 0);
+      lcd.pirnt("x: "); lcd.print(agx);
+      lcd.print(" y: "); lcd.print(agy);
+      lcd.setCursor(1, 0);
+      lcd.print("z: "); lcd.print(agz);
+      break;
     }
   }
 }
