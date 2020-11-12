@@ -15,6 +15,8 @@
 
 //#define IRDEBUG
 #define DEBUG
+//#define ACCELGYRO_SERIAL_OUTPUT
+//#define GPS_SERIAL_OUTPUT
 
 #define GPS Serial1
 #define SIM Serial2
@@ -49,7 +51,7 @@ inline void nowPosiModify(long long);
 
 
 double Lati, Logi, Alti, Skmph, Smps, Acce, timeDelta;
-int Year, Month, Day, Hour, Minute, Second, Timer, nowPosi;
+int Year, Month, Day, Hour, Minute, Second, Timer;
 
 char sout[101];
 
@@ -120,13 +122,11 @@ void loop() {
 
   while (GPS.available()) {
     if (gpsData.encode(GPS.read())) {
-      getGpsData(); dataUpd();
+      getGpsData(); //dataUpd();
       #ifdef DEBUG
-      if (irrecv.decode(&results)) {
-        lcd.clear(); lcd.setCursor(0, 0);
-        nowPosiModify(results.value);
-        irrecv.resume();
-      }
+      irrecv.decode(&results);
+      nowPosiModify(results.value);
+      irrecv.resume();
       #endif
     }
   }
@@ -188,19 +188,27 @@ inline void getGpsData () {
   Minute = gpsData.time.minute();
   Second = gpsData.time.second();
 
+  #ifdef GPS_SERIAL_OUTPUT
+
   sprintf(sout, "Date: %d/%d/%d %d:%d:%d\n", Year, Month, Day, Hour, Minute, Second);
   Serial.print (sout);
   
+  #endif
+
   Lati = gpsData.location.lat();
   Logi = gpsData.location.lng();
   Alti = gpsData.altitude.meters();
   
+  #ifdef GPS_SERIAL_OUTPUT
+
   Serial.print  ("Latitude= ");
   Serial.print  (Lati, 6);
   Serial.print  (" Longitude= ");
   Serial.print  (Logi, 6);
   Serial.print  (" Altitude= ");
   Serial.println(Alti, 6);
+
+  #endif
 
   Acce = (gpsData.speed.mps() - Smps) / (timeDelta=((double)(millis()-Timer)/1000.0));
   Timer = millis();
@@ -212,12 +220,16 @@ inline void getGpsData () {
 
   rotateCheck();
 
+  #ifdef GPS_SERIAL_OUTPUT
+
   Serial.print  ("Speed: ");
   Serial.print  (Skmph, 2);
   Serial.print  (" Acce: ");
   Serial.println(Acce, 10);
 
-  delay(500);
+  #endif
+
+  //delay(500);
 }
 
 inline void accidentReport () {
@@ -297,53 +309,73 @@ inline bool rotateCheck () {
   Py = Py + 0.0025, Ky = Py / (Py + Ry), agy = agy + Ky * (aay - agy), Py = (1 - Ky) * Py;
   Pz = Pz + 0.0025, Kz = Pz / (Pz + Rz), agz = agz + Kz * (aaz - agz), Pz = (1 - Kz) * Pz;
 
+  #ifdef ACCELGYRO_SERIAL_OUTPUT
+
   Serial.print(agx); Serial.print(","); Serial.print(agy); Serial.print(","); Serial.print(agz);
   Serial.println();
+
+  #endif
 
   return false;
 }
 
+int ret=-1, rettmp=-1;
+bool flag=true;
+const int tot_sta=5;
+
 inline void nowPosiModify (long long res) {
-  register int ret=0;
-  if (ret=lcd_rm_encode(res) > 1000) {
-    switch (ret) {
-      case 1001: ret = (ret+1)%10;
-      case 1002: ret = --ret<0? ret+10:ret;
-    }
+  rettmp=lcd_rm_encode(res);
+  if (rettmp != -1) {
+    if (rettmp>1000 && rettmp<=1100) {
+      if (true) {
+        flag=false;
+        switch (rettmp) {
+          case 1001: {ret = (ret+1)%tot_sta; break;}
+          case 1002: {ret = --ret<0? ret+tot_sta:ret; break;}
+        }
+      }
+    } else ret=rettmp, flag=true;
   }
 
   switch (ret) {
     case 0: {
       lcd.clear(); lcd.setCursor(0, 0);
-      lcd.print(Year); lcd.print("/"); lcd.print(Month); lcd.pirnt("/"); lcd.print(Day);
-      lcd.setCursor(1, 0);
+      lcd.print(Year); lcd.print("/"); lcd.print(Month); lcd.print("/"); lcd.print(Day);
+      lcd.setCursor(0, 1);
       lcd.print(Hour); lcd.print(":"); lcd.print(Minute); lcd.print(":"); lcd.print(Second);
       break;
     } case 1: {
       lcd.clear(); lcd.setCursor(0, 0);
       lcd.print("Logi: "); lcd.print(Logi);
-      lcd.setCursor(1, 0);
+      lcd.setCursor(0, 1);
       lcd.print("Lati: "); lcd.print(Lati);
       break;
     } case 2: {
       lcd.clear(); lcd.setCursor(0, 0);
       lcd.print ("Speed(Kmph): ");
-      lcd.setCursor(1, 0); lcd.print(Skmph);
+      lcd.setCursor(0, 1); lcd.print(Skmph);
       break;
     } case 3: {
       lcd.clear(); lcd.setCursor(0, 0);
       lcd.print ("Acceleration:");
-      lcd.setCursor(1, 0); lcd.print(Acce);
+      lcd.setCursor(0, 1); lcd.print(Acce);
       break;
     } case 4: {
       lcd.clear(); lcd.setCursor(0, 0);
-      lcd.pirnt("x: "); lcd.print(agx);
-      lcd.print(" y: "); lcd.print(agy);
-      lcd.setCursor(1, 0);
-      lcd.print("z: "); lcd.print(agz);
+      lcd.print("x:"); lcd.print(agx);
+      lcd.print(" y:"); lcd.print(agy);
+      lcd.setCursor(0, 1);
+      lcd.print("z:"); lcd.print(agz);
       break;
     }
-  }
+  } rettmp = -1;
+
+  #ifdef DEBUG
+  Serial.print("ret: ");
+  Serial.print(ret);
+  Serial.print(" tettmp: ");
+  Serial.println(rettmp);
+  #endif
 }
 
 inline int lcd_rm_encode (long long res) {
@@ -365,5 +397,6 @@ inline int lcd_rm_encode (long long res) {
     case 0xFF52AD: return 9;
     case 0xFF22DD: return 1001;
     case 0xFF02FD: return 1002;
+    default: return -1;
   }
 }
