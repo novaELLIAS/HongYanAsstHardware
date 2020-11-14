@@ -18,7 +18,8 @@
 //#define IRDEBUG
 #define DEBUG
 //#define INTERRUPT_ENABLED
-#define ACCELGYRO_SERIAL_OUTPUT
+//#define ACCELGYRO_SERIAL_OUTPUT
+#define ACCIDENT_TEST
 //#define LOCAL_TEST
 //#define GPS_SERIAL_OUTPUT
 
@@ -43,6 +44,7 @@ decode_results results;
 
 #define SSID "ELLIAS"
 #define PASSWORD "Akimihomura!"
+#define TEL_NUM 15724575401
 #define HOST_NAME "api.heclouds.com"
 #define HOST_PORT (80)
 #define DEVICE_ID "644250210"
@@ -119,6 +121,10 @@ void setup() {
   accelgyroSetUp(); lcd.print("#");
 
   irrecv.enableIRIn(); lcd.print("#");
+
+  #ifdef ACCIDENT_TEST
+  accidentReport ();
+  #endif
 
   Serial.println("setup end\r\n"); lcd.print("#] OK.");
 }
@@ -260,6 +266,12 @@ inline void getGpsData () {
 
 inline void accidentReport () {
   Serial.println ("Accident Report Trigged.");
+  SIM.begin(9600);
+  SIM.println("AT"); delay(1000);
+  SIM.println("AT+CMGF=1"); delay(1000);
+  SIM.println("AT+CMGS=\"15724575401\"");
+  delay(1000); SIM.print("test.\r\n");
+  delay(1000); SIM.write(0x1A);
 }
 
 // Kalman
@@ -372,7 +384,7 @@ inline void nowPosiModify (long long res) {
       if (Month<10) lcd.print("0"); lcd.print(Month); lcd.print("/");
       if (Day  <10) lcd.print("0"); lcd.print(Day);
       lcd.setCursor(0, 1);
-      lcd.print(Hour); lcd.print(":");
+      if (Hour<10)   lcd.print("0"); lcd.print(Hour); lcd.print(":");
       if (Minute<10) lcd.print("0"); lcd.print(Minute); lcd.print(":");
       if (Second<10) lcd.print("0"); lcd.print(Second);
       break;
