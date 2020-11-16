@@ -13,6 +13,7 @@
 #include <avr/power.h>
 #include <IRremote.h>
 #include "I2Cdev.h"
+#include <SCoop.h>
 #include "ESP8266.h"
 
 //#define IRDEBUG
@@ -20,7 +21,6 @@
 //#define INTERRUPT_ENABLED
 //#define ACCELGYRO_SERIAL_OUTPUT
 #define ACCIDENT_TEST
-//#define LOCAL_TEST
 //#define GPS_SERIAL_OUTPUT
 
 #define pinInterrupt 2
@@ -29,6 +29,10 @@
 #define GPS Serial1
 #define SIM Serial2
 #define ESPWIFI ESPSOFT
+
+defineTask(dataFetch);
+defineTask(dataUpload);
+defineTask(debugOutput);
 
 SoftwareSerial ESPSOFT(13,12);
 MPU6050 accelgyro;
@@ -68,111 +72,144 @@ long long interTimer;
 
 char sout[101];
 
-void setup() {
-  lcd.begin(16, 2);
-  lcd.setCursor(0, 0);
-  lcd.print("Initializing...");
-  lcd.setCursor(0, 1);
+void dataFetch::setup() {
+  //Serial.println("``");
+}
 
-  Serial.begin(9600);
-  GPS.begin(9600);
-  ESPWIFI.begin(115200);
-  SIM.begin(9600);
 
-  lcd.print("[#");
-  lcd.setCursor(10, 1);
-  lcd.print("]");
-  lcd.setCursor(1, 1);
 
-  pinMode(pinInterrupt, INPUT);
-  pinMode(lcdBackLight, OUTPUT);
+void dataUpload::setup() {
+//Serial.println("``");
+}
 
-  digitalWrite(lcdBackLight, HIGH);
+void debugOutput::setup() {
+//Serial.println("``");
+}
 
-  SIM.println("AT+CMGF=1");
+void dataFetch::loop() {
+  while (GPS.available()) {
+    if (gpsData.encode(GPS.read())) {
+      getGpsData();
+    } 
+  } sleep (100);
+}
 
-  lcd.print("#");
+void dataUpload::loop() {
+  dataUpd();sleep (100);
+}
 
-  Serial.print("setup begin\r\n");
-  Serial.print("FW Version: ");
-  Serial.println(WLAN.getVersion().c_str());
-
-  lcd.print("#");
-
-  if (WLAN.setOprToStation()) {
-    Serial.print("to station ok\r\n");
-  } else {
-    Serial.print("to station err\r\n");
-  } lcd.print("#");
-  if (WLAN.joinAP(SSID, PASSWORD)) {
-    Serial.print("Join AP success\r\n");
-    Serial.print("IP: ");
-    Serial.println(WLAN.getLocalIP().c_str());
-  } else {
-    Serial.print("Join AP failure\r\n");
-  } lcd.print("#");
-  ESPWIFI.println("AT+UART_CUR=9600,8,1,0,0");
-  ESPWIFI.begin(9600);
-
-  lcd.print("#");
-
-  interTimer = Timer = millis(); lcd.print("#");
-
-  accelgyroSetUp(); lcd.print("#");
-
-  irrecv.enableIRIn(); lcd.print("#");
-
-  #ifdef ACCIDENT_TEST
-  accidentReport ();
+void debugOutput::loop() {
+  #ifdef DEBUG
+    register bool flag=irrecv.decode(&results);
+    nowPosiModify(results.value);
+    irrecv.resume(); if (flag) interTimer=millis();
   #endif
+  sleep (100);
+}
 
-  Serial.println("setup end\r\n"); lcd.print("#] OK.");
+void setup() {
+  // lcd.begin(16, 2);
+  // lcd.setCursor(0, 0);
+  // lcd.print("Initializing...");
+  // lcd.setCursor(0, 1);
+
+  // Serial.begin(9600);
+  // GPS.begin(9600);
+  // ESPWIFI.begin(115200);
+  // SIM.begin(9600);
+
+  // lcd.print("[#");
+  // lcd.setCursor(10, 1);
+  // lcd.print("]");
+  // lcd.setCursor(1, 1);
+
+  // pinMode(pinInterrupt, INPUT);
+  // pinMode(lcdBackLight, OUTPUT);
+
+  // digitalWrite(lcdBackLight, HIGH);
+
+  // SIM.println("AT+CMGF=1");
+
+  // lcd.print("#");
+
+  // Serial.print("setup begin\r\n");
+  // Serial.print("FW Version: ");
+  // Serial.println(WLAN.getVersion().c_str());
+
+  // lcd.print("#");
+
+  // if (WLAN.setOprToStation()) {
+  //   Serial.print("to station ok\r\n");
+  // } else {
+  //   Serial.print("to station err\r\n");
+  // } lcd.print("#");
+  // if (WLAN.joinAP(SSID, PASSWORD)) {
+  //   Serial.print("Join AP success\r\n");
+  //   Serial.print("IP: ");
+  //   Serial.println(WLAN.getLocalIP().c_str());
+  // } else {
+  //   Serial.print("Join AP failure\r\n");
+  // } lcd.print("#");
+  // ESPWIFI.println("AT+UART_CUR=9600,8,1,0,0");
+  // ESPWIFI.begin(9600);
+
+  // lcd.print("#");
+
+  // interTimer = Timer = millis(); lcd.print("#");
+
+  // accelgyroSetUp(); lcd.print("#");
+
+  // irrecv.enableIRIn(); lcd.print("#");
+
+  // #ifdef ACCIDENT_TEST
+  // accidentReport ();
+  // #endif
+
+  // Serial.println("setup end\r\n"); lcd.print("#] OK.");
+
+  mySCoop.start();
 }
 
 void loop() {
 
-  #ifdef IRDEBUG
+  // #ifdef IRDEBUG
 
-  if (irrecv.decode(&results)) {
-    lcd.clear(); lcd.setCursor(0, 0);
-    Serial.println(results.value, HEX);
-    lcd.print(results.value, HEX);
-    irrecv.resume();
-  }
+  // if (irrecv.decode(&results)) {
+  //   lcd.clear(); lcd.setCursor(0, 0);
+  //   Serial.println(results.value, HEX);
+  //   lcd.print(results.value, HEX);
+  //   irrecv.resume();
+  // }
 
-  #endif
+  // #endif
 
-  while (GPS.available()) {
-    if (gpsData.encode(GPS.read())) {
-      getGpsData();
+  // while (GPS.available()) {
+  //   if (gpsData.encode(GPS.read())) {
+  //     getGpsData(); dataUpd();
 
-      #ifdef LOCAL_TEST
-      dataUpd();
-      #endif
+  //     #ifdef DEBUG
+  //     register bool flag=irrecv.decode(&results);
+  //     nowPosiModify(results.value);
+  //     irrecv.resume(); if (flag) interTimer=millis();
+  //     #endif
+  //   }
+  // }
 
-      #ifdef DEBUG
-      register bool flag=irrecv.decode(&results);
-      nowPosiModify(results.value);
-      irrecv.resume(); if (flag) interTimer=millis();
-      #endif
-    }
-  }
-
-  #ifdef INTERRUPT_ENABLED
-  if (millis()-interTimer>=10000 && check_motion()) gotoSleep();
-  #endif
-
+  // #ifdef INTERRUPT_ENABLED
+  // if (millis()-interTimer>=10000 && check_motion()) gotoSleep();
+  // #endif
+  yield();
 }
 
 inline void dataUpd () {
   if (WLAN.createTCP(HOST_NAME, HOST_PORT)) {
-      Serial.print("create tcp ok\r\n");
+      //Serial.print("create tcp ok\r\n");
       char buf[10];
       String jsonToSend = "{\"Logitude\":";
-      dtostrf(Logi, 1, 2, buf);
+      dtostrf(Logi, 1, 10, buf);
       jsonToSend += "\"" + String(buf) + "\"";
       jsonToSend += ",\"Latitude\":";
-      dtostrf(Lati, 1, 2, buf);
+      dtostrf(Lati, 1, 10, buf);
       jsonToSend += "\"" + String(buf) + "\"";
       jsonToSend += ",\"Speed\":";
       dtostrf(Skmph, 1, 2, buf);
@@ -198,17 +235,17 @@ inline void dataUpd () {
       postString += "\r\n";
 
       const char *postArray = postString.c_str();
-      Serial.println(postArray);
+      //Serial.println(postArray);
       WLAN.send((const uint8_t *)postArray, strlen(postArray));
-      Serial.println("send success");
+      //Serial.println("send success");
       if (WLAN.releaseTCP()) {
-        Serial.print("release tcp ok\r\n");
+        //Serial.print("release tcp ok\r\n");
       } else {
-        Serial.print("release tcp err\r\n");
+        //Serial.print("release tcp err\r\n");
       }
       postArray = NULL;
     } else {
-      Serial.print("create tcp err\r\n");
+      //Serial.print("create tcp err\r\n");
     }
 }
 
@@ -223,7 +260,7 @@ inline void getGpsData () {
   #ifdef GPS_SERIAL_OUTPUT
 
   sprintf(sout, "Date: %d/%d/%d %d:%d:%d\n", Year, Month, Day, Hour, Minute, Second);
-  Serial.print (sout);
+  //Serial.print (sout);
   
   #endif
 
@@ -415,10 +452,10 @@ inline void nowPosiModify (long long res) {
   } rettmp = -1;
 
   #ifdef DEBUG
-  Serial.print("ret: ");
-  Serial.print(ret);
-  Serial.print(" tettmp: ");
-  Serial.println(rettmp);
+  //Serial.print("ret: ");
+  //Serial.print(ret);
+  //Serial.print(" tettmp: ");
+  //Serial.println(rettmp);
   #endif
 }
 
@@ -444,6 +481,7 @@ inline int lcd_rm_encode (long long res) {
     default: return -1;
   }
 }
+
 
 void interruptFunc (void) {
   lcd.clear(); digitalWrite(lcdBackLight, HIGH);
