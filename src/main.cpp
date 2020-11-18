@@ -35,8 +35,9 @@
 // defineTask(dataUpload);
 // defineTask(debugOutput);
 
-Metro dataUpdate = Metro(5000);
-Metro dataFetch  = Metro(500);
+Metro dataUpdate      = Metro(5000);
+Metro dataFetch       = Metro(1000);
+Metro accidentMonitor = Metro(100);
 
 SoftwareSerial ESPSOFT(13,12);
 MPU6050 accelgyro;
@@ -151,29 +152,17 @@ void loop() {
 
   #endif
 
-  // if (dataFetch.check()) {
-    
-  //   #ifdef DEBUG
-  //   Serial.println("dataFetch");
-  //   #endif
-
-  //   while (GPS.available()) {
-  //     getGpsData();
-  //   }
-  // }
-
-  // if (dataUpdate.check()) {
-  //   if (Lati!=0.0 || Logi!=0.0) {
-  //     dataUpd();
-  //   }
-  // }
+  //Serial.println("Loop Runtime");
 
   while (GPS.available()) {
     if (gpsData.encode(GPS.read())) {
       
       if (dataFetch.check())  getGpsData();
       if (dataUpdate.check()) dataUpd();
-
+      if (accidentMonitor.check()) {
+        if (Skmph>=25.0 && rotateCheck() && abs(Acce)>=20.0) accidentReport();
+      }
+      
       #ifdef DEBUG
       register bool flag=irrecv.decode(&results);
       nowPosiModify(results.value);
@@ -192,10 +181,13 @@ void dataUpd () {
       Serial.println("create tcp ok\r\n");
       char buf[10];
       String jsonToSend = "{\"Logitude\":";
-      dtostrf(Logi, 1, 10, buf);
+      dtostrf(Logi, 1, 6, buf);
       jsonToSend += "\"" + String(buf) + "\"";
       jsonToSend += ",\"Latitude\":";
-      dtostrf(Lati, 1, 10, buf);
+      dtostrf(Lati, 1, 6, buf);
+      jsonToSend += "\"" + String(buf) + "\"";
+      jsonToSend += ",\"Altitude\":";
+      dtostrf(Alti, 1, 6, buf);
       jsonToSend += "\"" + String(buf) + "\"";
       jsonToSend += ",\"Speed\":";
       dtostrf(Skmph, 1, 2, buf);
@@ -270,10 +262,6 @@ void getGpsData () {
 
   Skmph = gpsData.speed.kmph();
   Smps  = gpsData.speed.mps();
-
-  if (Skmph>=25.0 && rotateCheck() && Acce>=20.0) accidentReport();
-
-  rotateCheck();
 
   #ifdef GPS_SERIAL_OUTPUT
 
