@@ -9,11 +9,12 @@
 #include <Wire.h>
 #include <MPU6050.h>
 #include <LiquidCrystal.h>
-#include <avr/sleep.h>
-#include <avr/power.h>
+//#include <avr/sleep.h>
+//#include <avr/power.h>
 #include <IRremote.h>
 #include "I2Cdev.h"
-#include <SCoop.h>
+//#include <SCoop.h>
+#include <Metro.h>
 #include "ESP8266.h"
 
 //#define IRDEBUG
@@ -21,7 +22,7 @@
 //#define INTERRUPT_ENABLED
 //#define ACCELGYRO_SERIAL_OUTPUT
 #define ACCIDENT_TEST
-//#define GPS_SERIAL_OUTPUT
+#define GPS_SERIAL_OUTPUT
 
 #define pinInterrupt 2
 #define lcdBackLight 28
@@ -30,9 +31,12 @@
 #define SIM Serial2
 #define ESPWIFI ESPSOFT
 
-defineTask(dataFetch);
-defineTask(dataUpload);
-defineTask(debugOutput);
+// defineTask(dataFetch);
+// defineTask(dataUpload);
+// defineTask(debugOutput);
+
+Metro dataUpdate = Metro(5000);
+Metro dataFetch  = Metro(500);
 
 SoftwareSerial ESPSOFT(13,12);
 MPU6050 accelgyro;
@@ -54,15 +58,15 @@ decode_results results;
 #define DEVICE_ID "644250210"
 const String APIKey = "fhAS54e5X8HL5wcaB6ZW74oA3vo=";
 
-inline void getGpsData();
-inline void dataUpd();
-inline void accidentReport();
-inline void accelgyroSetUp();
-inline bool rotateCheck();
-inline int lcd_rm_encode(long long);
-inline void nowPosiModify(long long);
+void getGpsData();
+void dataUpd();
+void accidentReport();
+void accelgyroSetUp();
+bool rotateCheck();
+int lcd_rm_encode(long long);
+void nowPosiModify(long long);
 void gotoSleep(void);
-inline bool check_motion();
+bool check_motion();
 
 #define abs(x) ((x)<0? (-x):(x))
 
@@ -72,138 +76,120 @@ long long interTimer;
 
 char sout[101];
 
-void dataFetch::setup() {
-  //Serial.println("``");
-}
-
-
-
-void dataUpload::setup() {
-//Serial.println("``");
-}
-
-void debugOutput::setup() {
-//Serial.println("``");
-}
-
-void dataFetch::loop() {
-  while (GPS.available()) {
-    if (gpsData.encode(GPS.read())) {
-      getGpsData();
-    } 
-  } sleep (100);
-}
-
-void dataUpload::loop() {
-  dataUpd();sleep (100);
-}
-
-void debugOutput::loop() {
-  #ifdef DEBUG
-    register bool flag=irrecv.decode(&results);
-    nowPosiModify(results.value);
-    irrecv.resume(); if (flag) interTimer=millis();
-  #endif
-  sleep (100);
-}
-
 void setup() {
-  // lcd.begin(16, 2);
-  // lcd.setCursor(0, 0);
-  // lcd.print("Initializing...");
-  // lcd.setCursor(0, 1);
+  lcd.begin(16, 2);
+  lcd.setCursor(0, 0);
+  lcd.print("Initializing...");
+  lcd.setCursor(0, 1);
 
-  // Serial.begin(9600);
-  // GPS.begin(9600);
-  // ESPWIFI.begin(115200);
-  // SIM.begin(9600);
+  Serial.begin(9600);
+  GPS.begin(9600);
+  ESPWIFI.begin(115200);
+  SIM.begin(9600);
 
-  // lcd.print("[#");
-  // lcd.setCursor(10, 1);
-  // lcd.print("]");
-  // lcd.setCursor(1, 1);
+  lcd.print("[#");
+  lcd.setCursor(10, 1);
+  lcd.print("]");
+  lcd.setCursor(1, 1);
 
-  // pinMode(pinInterrupt, INPUT);
-  // pinMode(lcdBackLight, OUTPUT);
+  pinMode(pinInterrupt, INPUT);
+  pinMode(lcdBackLight, OUTPUT);
 
-  // digitalWrite(lcdBackLight, HIGH);
+  digitalWrite(lcdBackLight, HIGH);
 
-  // SIM.println("AT+CMGF=1");
+  SIM.println("AT+CMGF=1");
 
-  // lcd.print("#");
+  lcd.print("#");
 
-  // Serial.print("setup begin\r\n");
-  // Serial.print("FW Version: ");
-  // Serial.println(WLAN.getVersion().c_str());
+  Serial.print("setup begin\r\n");
+  Serial.print("FW Version: ");
+  Serial.println(WLAN.getVersion().c_str());
 
-  // lcd.print("#");
+  lcd.print("#");
 
-  // if (WLAN.setOprToStation()) {
-  //   Serial.print("to station ok\r\n");
-  // } else {
-  //   Serial.print("to station err\r\n");
-  // } lcd.print("#");
-  // if (WLAN.joinAP(SSID, PASSWORD)) {
-  //   Serial.print("Join AP success\r\n");
-  //   Serial.print("IP: ");
-  //   Serial.println(WLAN.getLocalIP().c_str());
-  // } else {
-  //   Serial.print("Join AP failure\r\n");
-  // } lcd.print("#");
-  // ESPWIFI.println("AT+UART_CUR=9600,8,1,0,0");
-  // ESPWIFI.begin(9600);
+  if (WLAN.setOprToStation()) {
+    Serial.print("to station ok\r\n");
+  } else {
+    Serial.print("to station err\r\n");
+  } lcd.print("#");
+  if (WLAN.joinAP(SSID, PASSWORD)) {
+    Serial.print("Join AP success\r\n");
+    Serial.print("IP: ");
+    Serial.println(WLAN.getLocalIP().c_str());
+  } else {
+    Serial.print("Join AP failure\r\n");
+  } lcd.print("#");
+  ESPWIFI.println("AT+UART_CUR=9600,8,1,0,0");
+  ESPWIFI.begin(9600);
 
-  // lcd.print("#");
+  lcd.print("#");
 
-  // interTimer = Timer = millis(); lcd.print("#");
+  interTimer = Timer = millis(); lcd.print("#");
 
-  // accelgyroSetUp(); lcd.print("#");
+  accelgyroSetUp(); lcd.print("#");
 
-  // irrecv.enableIRIn(); lcd.print("#");
+  irrecv.enableIRIn(); lcd.print("#");
 
-  // #ifdef ACCIDENT_TEST
-  // accidentReport ();
-  // #endif
+  #ifdef ACCIDENT_TEST
+  accidentReport ();
+  #endif
 
-  // Serial.println("setup end\r\n"); lcd.print("#] OK.");
+  Serial.println("setup end\r\n"); lcd.print("#] OK.");
 
-  mySCoop.start();
 }
 
 void loop() {
 
-  // #ifdef IRDEBUG
+  #ifdef IRDEBUG
 
-  // if (irrecv.decode(&results)) {
-  //   lcd.clear(); lcd.setCursor(0, 0);
-  //   Serial.println(results.value, HEX);
-  //   lcd.print(results.value, HEX);
-  //   irrecv.resume();
-  // }
+  if (irrecv.decode(&results)) {
+    lcd.clear(); lcd.setCursor(0, 0);
+    Serial.println(results.value, HEX);
+    lcd.print(results.value, HEX);
+    irrecv.resume();
+  }
 
-  // #endif
+  #endif
 
-  // while (GPS.available()) {
-  //   if (gpsData.encode(GPS.read())) {
-  //     getGpsData(); dataUpd();
+  // if (dataFetch.check()) {
+    
+  //   #ifdef DEBUG
+  //   Serial.println("dataFetch");
+  //   #endif
 
-  //     #ifdef DEBUG
-  //     register bool flag=irrecv.decode(&results);
-  //     nowPosiModify(results.value);
-  //     irrecv.resume(); if (flag) interTimer=millis();
-  //     #endif
+  //   while (GPS.available()) {
+  //     getGpsData();
   //   }
   // }
 
-  // #ifdef INTERRUPT_ENABLED
-  // if (millis()-interTimer>=10000 && check_motion()) gotoSleep();
-  // #endif
-  yield();
+  // if (dataUpdate.check()) {
+  //   if (Lati!=0.0 || Logi!=0.0) {
+  //     dataUpd();
+  //   }
+  // }
+
+  while (GPS.available()) {
+    if (gpsData.encode(GPS.read())) {
+      
+      if (dataFetch.check())  getGpsData();
+      if (dataUpdate.check()) dataUpd();
+
+      #ifdef DEBUG
+      register bool flag=irrecv.decode(&results);
+      nowPosiModify(results.value);
+      irrecv.resume(); if (flag) interTimer=millis();
+      #endif
+    }
+  }
+
+  #ifdef INTERRUPT_ENABLED
+  if (millis()-interTimer>=10000 && check_motion()) gotoSleep();
+  #endif
 }
 
-inline void dataUpd () {
+void dataUpd () {
   if (WLAN.createTCP(HOST_NAME, HOST_PORT)) {
-      //Serial.print("create tcp ok\r\n");
+      Serial.println("create tcp ok\r\n");
       char buf[10];
       String jsonToSend = "{\"Logitude\":";
       dtostrf(Logi, 1, 10, buf);
@@ -235,21 +221,21 @@ inline void dataUpd () {
       postString += "\r\n";
 
       const char *postArray = postString.c_str();
-      //Serial.println(postArray);
+      Serial.println(postArray);
       WLAN.send((const uint8_t *)postArray, strlen(postArray));
-      //Serial.println("send success");
-      if (WLAN.releaseTCP()) {
-        //Serial.print("release tcp ok\r\n");
-      } else {
-        //Serial.print("release tcp err\r\n");
-      }
+      // Serial.println("send success");
+      // if (WLAN.releaseTCP()) {
+      //   Serial.print("release tcp ok\r\n");
+      // } else {
+      //   Serial.print("release tcp err\r\n");
+      // }
       postArray = NULL;
     } else {
-      //Serial.print("create tcp err\r\n");
+      Serial.print("create tcp err\r\n");
     }
 }
 
-inline void getGpsData () {
+void getGpsData () {
   Year   = gpsData.date.year();
   Month  = gpsData.date.month();
   Day    = gpsData.date.day();
@@ -301,7 +287,7 @@ inline void getGpsData () {
   //delay(500);
 }
 
-inline void accidentReport () {
+void accidentReport () {
   Serial.println ("Accident Report Trigged.");
   SIM.begin(9600);
   SIM.println("AT"); delay(1000);
@@ -329,7 +315,7 @@ long long aax_sum, aay_sum,aaz_sum;
 double a_x[10]={0}, a_y[10]={0}, a_z[10]={0}, g_x[10]={0}, g_y[10]={0}, g_z[10]={0};
 double Px=1, Rx, Kx, Sx, Vx, Qx, Py=1, Ry, Ky, Sy, Vy, Qy, Pz=1, Rz, Kz, Sz, Vz, Qz;
 
-inline void accelgyroSetUp () {
+void accelgyroSetUp () {
   Wire.begin(); accelgyro.initialize();
   unsigned short times = 200;
   for (register int i=0; i^times; ++ i) {
@@ -338,7 +324,7 @@ inline void accelgyroSetUp () {
   } axo /= times, ayo /= times, azo /= times, gxo /= times, gyo /= times, gzo /= times;
 }
 
-inline bool rotateCheck () {
+bool rotateCheck () {
   unsigned long now = millis();
   dt = (now - lastTime) / 1000.0;
   lastTime = now;
@@ -398,7 +384,7 @@ int ret, rettmp=-1;
 bool flag=true;
 const int tot_sta=5;
 
-inline void nowPosiModify (long long res) {
+void nowPosiModify (long long res) {
   rettmp=lcd_rm_encode(res);
   if (rettmp != -1) {
     if (rettmp>1000 && rettmp<=1100) {
@@ -459,7 +445,7 @@ inline void nowPosiModify (long long res) {
   #endif
 }
 
-inline int lcd_rm_encode (long long res) {
+int lcd_rm_encode (long long res) {
   switch (res) {
     case 0xFF6897: return 0;
     //Show Time
@@ -483,23 +469,24 @@ inline int lcd_rm_encode (long long res) {
 }
 
 
-void interruptFunc (void) {
-  lcd.clear(); digitalWrite(lcdBackLight, HIGH);
-  lcd.print("A  W  A  K  E");
-  detachInterrupt(0);
-}
 
-void gotoSleep (void) {
-  lcd.clear(); lcd.setCursor(0, 0);
-  lcd.print("FALL ASLEEP."); digitalWrite(lcdBackLight, LOW);
-  attachInterrupt(digitalPinToInterrupt(2), interruptFunc, LOW);
-  delay(100); set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-  sleep_enable(); sleep_mode(); sleep_disable();
-}
+// void interruptFunc (void) {
+//   lcd.clear(); digitalWrite(lcdBackLight, HIGH);
+//   lcd.print("A  W  A  K  E");
+//   detachInterrupt(0);
+// }
+
+// void gotoSleep (void) {
+//   lcd.clear(); lcd.setCursor(0, 0);
+//   lcd.print("FALL ASLEEP."); digitalWrite(lcdBackLight, LOW);
+//   attachInterrupt(digitalPinToInterrupt(2), interruptFunc, LOW);
+//   delay(100); set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+//   sleep_enable(); sleep_mode(); sleep_disable();
+// }
 
 double preagx, preagy, preagz;
 
-inline bool check_motion() {
+bool check_motion() {
   register bool ret=abs(agx-preagx)<=5&&abs(agy-preagy)<=5&&abs(agz-preagz)<=5&&Skmph<=5;
   if (!ret) interTimer=millis(); preagx=agx; preagy=agy; preagz=agz; return ret;
 }
