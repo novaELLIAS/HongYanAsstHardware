@@ -29,7 +29,7 @@
 #define lcdBackLight 28
 
 #define GPS Serial1
-#define SIM Serial2
+//#define SIM Serial2
 #define ESPWIFI ESPSOFT
 
 // defineTask(dataFetch);
@@ -52,6 +52,8 @@ const int RECV_PIN = 11;
 IRrecv irrecv(RECV_PIN);
 decode_results results;
 
+sim800c sim800c(50, 51);
+
 #define SSID "ELLIAS"
 #define PASSWORD "Akimihomura!"
 #define TEL_NUM 15724575401
@@ -59,10 +61,14 @@ decode_results results;
 #define HOST_PORT (80)
 #define DEVICE_ID "644250210"
 const String APIKey = "fhAS54e5X8HL5wcaB6ZW74oA3vo=";
+const char* DEV_ID = "653000696"; //设备ID
+const char* DEV_PRO_ID = "387253"; //产品ID
+const char* DEV_KEY = "ofLsRjBj7VFXyH46hlfsRcs4RPg=";
+//const char* DEV_KEY = "5rSmDmXhkdzdfTkDZBfeKUT7pjg="; //master-API KEY
 
 void getGpsData();
 void dataUpd();
-void accidentReport();
+//void accidentReport();
 void accelgyroSetUp();
 bool rotateCheck();
 int lcd_rm_encode(long long);
@@ -87,7 +93,7 @@ void setup() {
   Serial.begin(9600);
   GPS.begin(9600);
   ESPWIFI.begin(115200);
-  SIM.begin(19200);
+  //SIM.begin(19200);
 
   lcd.print("[#");
   lcd.setCursor(10, 1);
@@ -101,30 +107,37 @@ void setup() {
 
   digitalWrite(lcdBackLight, HIGH);
 
-  SIM.println("AT");
+  //SIM.println("AT");
 
   lcd.print("#");
 
   Serial.print("setup begin\r\n");
-  Serial.print("FW Version: ");
-  Serial.println(WLAN.getVersion().c_str());
+  //Serial.print("FW Version: ");
+  //Serial.println(WLAN.getVersion().c_str());
 
   lcd.print("#");
 
-  if (WLAN.setOprToStation()) {
-    Serial.print("to station ok\r\n");
-  } else {
-    Serial.print("to station err\r\n");
-  } lcd.print("#");
-  if (WLAN.joinAP(SSID, PASSWORD)) {
-    Serial.print("Join AP success\r\n");
-    Serial.print("IP: ");
-    Serial.println(WLAN.getLocalIP().c_str());
-  } else {
-    Serial.print("Join AP failure\r\n");
-  } lcd.print("#");
-  ESPWIFI.println("AT+UART_CUR=9600,8,1,0,0");
-  ESPWIFI.begin(9600);
+  // if (WLAN.setOprToStation()) {
+  //   Serial.print("to station ok\r\n");
+  // } else {
+  //   Serial.print("to station err\r\n");
+  // } lcd.print("#");
+  // if (WLAN.joinAP(SSID, PASSWORD)) {
+  //   Serial.print("Join AP success\r\n");
+  //   Serial.print("IP: ");
+  //   Serial.println(WLAN.getLocalIP().c_str());
+  // } else {
+  //   Serial.print("Join AP failure\r\n");
+  // } lcd.print("#");
+  // ESPWIFI.println("AT+UART_CUR=9600,8,1,0,0");
+  // ESPWIFI.begin(9600);
+
+  sim800c.ssbegin(9600);
+  register int s=0;
+  do {
+    s = sim800c.initTCP();
+  } while (s = 0); delay(2000);
+  sim800c.MQTTConnect(DEV_ID, DEV_PRO_ID, DEV_KEY);
 
   lcd.print("#");
 
@@ -134,9 +147,9 @@ void setup() {
 
   irrecv.enableIRIn(); lcd.print("#");
 
-  #ifdef ACCIDENT_TEST
-  accidentReport ();
-  #endif
+  // #ifdef ACCIDENT_TEST
+  // accidentReport ();
+  // #endif
 
   Serial.println("setup end\r\n"); lcd.print("#] OK.");
 
@@ -162,9 +175,9 @@ void loop() {
       
       if (dataFetch.check())  getGpsData();
       if (dataUpdate.check()) dataUpd();
-      if (accidentMonitor.check()) {
-        if (Skmph>=25.0 && rotateCheck() && abs(Acce)>=20.0) accidentReport();
-      }
+      // if (accidentMonitor.check()) {
+      //   if (Skmph>=25.0 && rotateCheck() && abs(Acce)>=20.0) accidentReport();
+      // }
       
       #ifdef DEBUG
       register bool flag=irrecv.decode(&results);
@@ -179,55 +192,73 @@ void loop() {
   #endif
 }
 
+// void dataUpd () {
+//   if (WLAN.createTCP(HOST_NAME, HOST_PORT)) {
+//       Serial.println("create tcp ok\r\n");
+//       char buf[10];
+//       String jsonToSend = "{\"Logitude\":";
+//       dtostrf(Logi, 1, 6, buf);
+//       jsonToSend += "\"" + String(buf) + "\"";
+//       jsonToSend += ",\"Latitude\":";
+//       dtostrf(Lati, 1, 6, buf);
+//       jsonToSend += "\"" + String(buf) + "\"";
+//       jsonToSend += ",\"Altitude\":";
+//       dtostrf(Alti, 1, 6, buf);
+//       jsonToSend += "\"" + String(buf) + "\"";
+//       jsonToSend += ",\"Speed\":";
+//       dtostrf(Skmph, 1, 2, buf);
+//       jsonToSend += "\"" + String(buf) + "\"";
+//       jsonToSend += "}";
+
+//       String postString = "POST /devices/";
+//       postString += DEVICE_ID;
+//       postString += "/datapoints?type=3 HTTP/1.1";
+//       postString += "\r\n";
+//       postString += "api-key:";
+//       postString += APIKey;
+//       postString += "\r\n";
+//       postString += "Host:api.heclouds.com\r\n";
+//       postString += "Connection:close\r\n";
+//       postString += "Content-Length:";
+//       postString += jsonToSend.length();
+//       postString += "\r\n";
+//       postString += "\r\n";
+//       postString += jsonToSend;
+//       postString += "\r\n";
+//       postString += "\r\n";
+//       postString += "\r\n";
+
+//       const char *postArray = postString.c_str();
+//       Serial.println(postArray);
+//       WLAN.send((const uint8_t *)postArray, strlen(postArray));
+//       // Serial.println("send success");
+//       // if (WLAN.releaseTCP()) {
+//       //   Serial.print("release tcp ok\r\n");
+//       // } else {
+//       //   Serial.print("release tcp err\r\n");
+//       // }
+//       postArray = NULL;
+//     } else {
+//       Serial.print("create tcp err\r\n");
+//     }
+// }
+
 void dataUpd () {
-  if (WLAN.createTCP(HOST_NAME, HOST_PORT)) {
-      Serial.println("create tcp ok\r\n");
-      char buf[10];
-      String jsonToSend = "{\"Logitude\":";
-      dtostrf(Logi, 1, 6, buf);
-      jsonToSend += "\"" + String(buf) + "\"";
-      jsonToSend += ",\"Latitude\":";
-      dtostrf(Lati, 1, 6, buf);
-      jsonToSend += "\"" + String(buf) + "\"";
-      jsonToSend += ",\"Altitude\":";
-      dtostrf(Alti, 1, 6, buf);
-      jsonToSend += "\"" + String(buf) + "\"";
-      jsonToSend += ",\"Speed\":";
-      dtostrf(Skmph, 1, 2, buf);
-      jsonToSend += "\"" + String(buf) + "\"";
-      jsonToSend += "}";
-
-      String postString = "POST /devices/";
-      postString += DEVICE_ID;
-      postString += "/datapoints?type=3 HTTP/1.1";
-      postString += "\r\n";
-      postString += "api-key:";
-      postString += APIKey;
-      postString += "\r\n";
-      postString += "Host:api.heclouds.com\r\n";
-      postString += "Connection:close\r\n";
-      postString += "Content-Length:";
-      postString += jsonToSend.length();
-      postString += "\r\n";
-      postString += "\r\n";
-      postString += jsonToSend;
-      postString += "\r\n";
-      postString += "\r\n";
-      postString += "\r\n";
-
-      const char *postArray = postString.c_str();
-      Serial.println(postArray);
-      WLAN.send((const uint8_t *)postArray, strlen(postArray));
-      // Serial.println("send success");
-      // if (WLAN.releaseTCP()) {
-      //   Serial.print("release tcp ok\r\n");
-      // } else {
-      //   Serial.print("release tcp err\r\n");
-      // }
-      postArray = NULL;
-    } else {
-      Serial.print("create tcp err\r\n");
-    }
+  char buf[10];
+  String jsonToSend = "{\"Logitude\":";
+  dtostrf(Logi, 1, 6, buf);
+  jsonToSend += "\"" + String(buf) + "\"";
+  jsonToSend += ",\"Latitude\":";
+  dtostrf(Lati, 1, 6, buf);
+  jsonToSend += "\"" + String(buf) + "\"";
+  jsonToSend += ",\"Altitude\":";
+  dtostrf(Alti, 1, 6, buf);
+  jsonToSend += "\"" + String(buf) + "\"";
+  jsonToSend += ",\"Speed\":";
+  dtostrf(Skmph, 1, 2, buf);
+  jsonToSend += "\"" + String(buf) + "\"";
+  jsonToSend += "}";
+  //sim800c.public_data(jsonToSend.c_str());
 }
 
 void getGpsData () {
@@ -278,16 +309,16 @@ void getGpsData () {
   //delay(500);
 }
 
-void accidentReport () {
-  Serial.println ("Accident Report Trigged.");
-  SIM.begin(115200);
-  SIM.println("AT\r"); delay(1000);
-  SIM.println("AT+CMGF=1\r"); delay(1000);
-  //SIM.println("AT+CSCA=\"+8613800100500\"\r"); delay(1000);
-  SIM.println("AT+CMGS=\"+8613384009298\"\r"); delay(1000);
-  SIM.print("test.\r\n"); delay(1000); SIM.write(0x1A);
-  delay (10000);
-}
+// void accidentReport () {
+//   Serial.println ("Accident Report Trigged.");
+//   SIM.begin(115200);
+//   SIM.println("AT\r"); delay(1000);
+//   SIM.println("AT+CMGF=1\r"); delay(1000);
+//   //SIM.println("AT+CSCA=\"+8613800100500\"\r"); delay(1000);
+//   SIM.println("AT+CMGS=\"+8613384009298\"\r"); delay(1000);
+//   SIM.print("test.\r\n"); delay(1000); SIM.write(0x1A);
+//   delay (10000);
+// }
 
 // Kalman
 
