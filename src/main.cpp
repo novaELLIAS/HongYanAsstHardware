@@ -16,12 +16,13 @@
 //#include <SCoop.h>
 #include <Metro.h>
 #include "ESP8266.h"
+#include "sim800c_onenet.h"
 
 //#define IRDEBUG
 #define DEBUG
 //#define INTERRUPT_ENABLED
 //#define ACCELGYRO_SERIAL_OUTPUT
-#define ACCIDENT_TEST
+//#define ACCIDENT_TEST
 #define GPS_SERIAL_OUTPUT
 
 #define pinInterrupt 2
@@ -86,19 +87,21 @@ void setup() {
   Serial.begin(9600);
   GPS.begin(9600);
   ESPWIFI.begin(115200);
-  SIM.begin(9600);
+  SIM.begin(19200);
 
   lcd.print("[#");
   lcd.setCursor(10, 1);
   lcd.print("]");
   lcd.setCursor(1, 1);
 
+  delay(3000);
+
   pinMode(pinInterrupt, INPUT);
   pinMode(lcdBackLight, OUTPUT);
 
   digitalWrite(lcdBackLight, HIGH);
 
-  SIM.println("AT+CMGF=1");
+  SIM.println("AT");
 
   lcd.print("#");
 
@@ -277,12 +280,13 @@ void getGpsData () {
 
 void accidentReport () {
   Serial.println ("Accident Report Trigged.");
-  SIM.begin(9600);
-  SIM.println("AT"); delay(1000);
-  SIM.println("AT+CMGF=1"); delay(1000);
-  SIM.println("AT+CMGS=\"15724575401\"");
-  delay(1000); SIM.print("test.\r\n");
-  delay(1000); SIM.write(0x1A);
+  SIM.begin(115200);
+  SIM.println("AT\r"); delay(1000);
+  SIM.println("AT+CMGF=1\r"); delay(1000);
+  //SIM.println("AT+CSCA=\"+8613800100500\"\r"); delay(1000);
+  SIM.println("AT+CMGS=\"+8613384009298\"\r"); delay(1000);
+  SIM.print("test.\r\n"); delay(1000); SIM.write(0x1A);
+  delay (10000);
 }
 
 // Kalman
@@ -455,8 +459,6 @@ int lcd_rm_encode (long long res) {
     default: return -1;
   }
 }
-
-
 
 // void interruptFunc (void) {
 //   lcd.clear(); digitalWrite(lcdBackLight, HIGH);
