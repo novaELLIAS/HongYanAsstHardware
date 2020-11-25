@@ -15,8 +15,8 @@
 #include "I2Cdev.h"
 //#include <SCoop.h>
 #include <Metro.h>
-#include "ESP8266.h"
-#include "sim800c_onenet.h"
+//#include "ESP8266.h"
+//#include "sim800c_onenet.h"
 
 //#define IRDEBUG
 #define DEBUG
@@ -29,8 +29,8 @@
 #define lcdBackLight 28
 
 #define GPS Serial1
-//#define SIM Serial2
-#define ESPWIFI ESPSOFT
+#define SIM Serial2
+//#define ESPWIFI ESPSOFT
 
 // defineTask(dataFetch);
 // defineTask(dataUpload);
@@ -43,7 +43,7 @@ Metro accidentMonitor = Metro(100);
 SoftwareSerial ESPSOFT(13,12);
 MPU6050 accelgyro;
 TinyGPSPlus gpsData;
-ESP8266 WLAN(ESPSOFT);
+//ESP8266 WLAN(ESPSOFT);
 
 const int rs = 23, en = 22, d4 = 27, d5 = 26, d6 = 25, d7 = 24;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
@@ -52,8 +52,6 @@ const int RECV_PIN = 11;
 IRrecv irrecv(RECV_PIN);
 decode_results results;
 
-sim800c sim800c(50, 51);
-
 #define SSID "ELLIAS"
 #define PASSWORD "Akimihomura!"
 #define TEL_NUM 15724575401
@@ -61,14 +59,10 @@ sim800c sim800c(50, 51);
 #define HOST_PORT (80)
 #define DEVICE_ID "644250210"
 const String APIKey = "fhAS54e5X8HL5wcaB6ZW74oA3vo=";
-const char* DEV_ID = "653000696"; //设备ID
-const char* DEV_PRO_ID = "387253"; //产品ID
-const char* DEV_KEY = "ofLsRjBj7VFXyH46hlfsRcs4RPg=";
-//const char* DEV_KEY = "5rSmDmXhkdzdfTkDZBfeKUT7pjg="; //master-API KEY
 
 void getGpsData();
 void dataUpd();
-//void accidentReport();
+void accidentReport();
 void accelgyroSetUp();
 bool rotateCheck();
 int lcd_rm_encode(long long);
@@ -92,8 +86,8 @@ void setup() {
 
   Serial.begin(9600);
   GPS.begin(9600);
-  ESPWIFI.begin(115200);
-  //SIM.begin(19200);
+  //ESPWIFI.begin(115200);
+  SIM.begin(19200);
 
   lcd.print("[#");
   lcd.setCursor(10, 1);
@@ -107,7 +101,7 @@ void setup() {
 
   digitalWrite(lcdBackLight, HIGH);
 
-  //SIM.println("AT");
+  SIM.println("AT");
 
   lcd.print("#");
 
@@ -132,12 +126,12 @@ void setup() {
   // ESPWIFI.println("AT+UART_CUR=9600,8,1,0,0");
   // ESPWIFI.begin(9600);
 
-  sim800c.ssbegin(9600);
-  register int s=0;
-  do {
-    s = sim800c.initTCP();
-  } while (s = 0); delay(2000);
-  sim800c.MQTTConnect(DEV_ID, DEV_PRO_ID, DEV_KEY);
+  // sim800c.ssbegin(9600);
+  // register int s=0;
+  // do {
+  //   s = sim800c.initTCP();
+  // } while (s = 0); delay(2000);
+  // sim800c.MQTTConnect(DEV_ID, DEV_PRO_ID, DEV_KEY);
 
   lcd.print("#");
 
@@ -147,9 +141,9 @@ void setup() {
 
   irrecv.enableIRIn(); lcd.print("#");
 
-  // #ifdef ACCIDENT_TEST
-  // accidentReport ();
-  // #endif
+  #ifdef ACCIDENT_TEST
+  accidentReport ();
+  #endif
 
   Serial.println("setup end\r\n"); lcd.print("#] OK.");
 
@@ -175,9 +169,9 @@ void loop() {
       
       if (dataFetch.check())  getGpsData();
       if (dataUpdate.check()) dataUpd();
-      // if (accidentMonitor.check()) {
-      //   if (Skmph>=25.0 && rotateCheck() && abs(Acce)>=20.0) accidentReport();
-      // }
+      if (accidentMonitor.check()) {
+        if (Skmph>=25.0 && rotateCheck() && abs(Acce)>=20.0) accidentReport();
+      }
       
       #ifdef DEBUG
       register bool flag=irrecv.decode(&results);
@@ -244,6 +238,14 @@ void loop() {
 // }
 
 void dataUpd () {
+  SIM.println("AT\r"); delay(100);
+  SIM.println("AT+CGDCONT=1,\"IP\",\"CMNET\"\r"); delay(100);
+  SIM.println("AT+CGATT=1"); delay(100);
+  SIM.println("AT+CIPCSGP=1,\"CMNET\"\r"); delay(100);
+  SIM.println("AT+CLPORT=\"TCP\",\"2000\"\r"); delay(100);
+  SIM.println("AT+CIPSTART=\"TCP\",\"183.230.40.33\",\"80\"\r");
+  delay(100); SIM.println("AT+CIPSEND"); delay(100);
+  
   char buf[10];
   String jsonToSend = "{\"Logitude\":";
   dtostrf(Logi, 1, 6, buf);
@@ -258,7 +260,31 @@ void dataUpd () {
   dtostrf(Skmph, 1, 2, buf);
   jsonToSend += "\"" + String(buf) + "\"";
   jsonToSend += "}";
-  //sim800c.public_data(jsonToSend.c_str());
+
+  String postString = "POST /devices/";
+  postString += DEVICE_ID;
+  postString += "/datapoints?type=3 HTTP/1.1";
+  postString += "\r\n";
+  postString += "api-key:";
+  postString += APIKey;
+  postString += "\r\n";
+  postString += "Host:api.heclouds.com\r\n";
+  postString += "Connection:close\r\n";
+  postString += "Content-Length:";
+  postString += jsonToSend.length();
+  postString += "\r\n";
+  postString += "\r\n";
+  postString += jsonToSend;
+  postString += "\r\n";
+  postString += "\r\n";
+  postString += "\r\n";
+
+  const char *postArray = postString.c_str();
+  Serial.println(postArray);
+
+  SIM.write(postArray); delay(100); SIM.write(0x1A);
+
+  postArray = NULL;
 }
 
 void getGpsData () {
@@ -309,16 +335,16 @@ void getGpsData () {
   //delay(500);
 }
 
-// void accidentReport () {
-//   Serial.println ("Accident Report Trigged.");
-//   SIM.begin(115200);
-//   SIM.println("AT\r"); delay(1000);
-//   SIM.println("AT+CMGF=1\r"); delay(1000);
-//   //SIM.println("AT+CSCA=\"+8613800100500\"\r"); delay(1000);
-//   SIM.println("AT+CMGS=\"+8613384009298\"\r"); delay(1000);
-//   SIM.print("test.\r\n"); delay(1000); SIM.write(0x1A);
-//   delay (10000);
-// }
+void accidentReport () {
+  Serial.println ("Accident Report Trigged.");
+  SIM.begin(115200);
+  SIM.println("AT\r"); delay(1000);
+  SIM.println("AT+CMGF=1\r"); delay(1000);
+  //SIM.println("AT+CSCA=\"+8613800100500\"\r"); delay(1000);
+  SIM.println("AT+CMGS=\"+8613384009298\"\r"); delay(1000);
+  SIM.print("test.\r\n"); delay(1000); SIM.write(0x1A);
+  delay (10000);
+}
 
 // Kalman
 
