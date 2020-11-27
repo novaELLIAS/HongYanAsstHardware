@@ -20,17 +20,25 @@
 
 //#define IRDEBUG
 #define DEBUG
+//#define LCD_OUTPUT
 //#define INTERRUPT_ENABLED
 //#define ACCELGYRO_SERIAL_OUTPUT
 //#define ACCIDENT_TEST
 #define GPS_SERIAL_OUTPUT
+//#define WLAN_ENABLED
 
 #define pinInterrupt 2
 #define lcdBackLight 28
 
 #define GPS Serial1
 #define SIM Serial2
-//#define ESPWIFI ESPSOFT
+#define ESPWIFI ESPSOFT
+
+#define LedPower 2
+#define LedRed 3
+#define LedGre 4
+#define LedBlu 5
+#define LED_LITHT_DEC 4
 
 // defineTask(dataFetch);
 // defineTask(dataUpload);
@@ -43,17 +51,24 @@ Metro accidentMonitor = Metro(100);
 SoftwareSerial ESPSOFT(13,12);
 MPU6050 accelgyro;
 TinyGPSPlus gpsData;
-//ESP8266 WLAN(ESPSOFT);
+
+#ifdef WLAN_ENABLED
+ESP8266 WLAN(ESPSOFT);
+#endif
+
+#ifdef LCD_OUTPUT
 
 const int rs = 23, en = 22, d4 = 27, d5 = 26, d6 = 25, d7 = 24;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
+#endif
 
 const int RECV_PIN = 11;
 IRrecv irrecv(RECV_PIN);
 decode_results results;
 
-// #define SSID "ELLIAS"
-// #define PASSWORD "Akimihomura!"
+#define SSID "ELLIAS"
+#define PASSWORD "Akimihomura!"
 #define TEL_NUM "+8613800100500" //accident report target tel
 #define HOST_NAME "api.heclouds.com"
 #define ACCIDENT_ACCE 2 //minnimal acceleration to trigger accident report
@@ -62,6 +77,7 @@ decode_results results;
 #define DEVICE_ID "644250210" //device id
 const String APIKey = "fhAS54e5X8HL5wcaB6ZW74oA3vo="; //device api-key
 
+inline void ledWrite(int, int, int);
 void getGpsData();
 void dataUpd();
 void accidentReport();
@@ -73,7 +89,8 @@ void nowPosiModify(long long);
 //void gotoSleep(void);
 //bool check_motion();
 
-#define abs(x) ((x)<0? (-x):(x))
+template <typename T>
+inline T Abs(T x) {return (x)<0? (-x):(x);}
 
 double Lati, Logi, Alti, Skmph, Smps, Acce, timeDelta;
 int Year, Month, Day, Hour, Minute, Second, Timer;
@@ -82,73 +99,131 @@ long long interTimer;
 char sout[101];
 
 void setup() {
+
+  #ifdef LCD_OUTPUT
+
   lcd.begin(16, 2);
   lcd.setCursor(0, 0);
   lcd.print("Initializing...");
   lcd.setCursor(0, 1);
 
+  #endif
+
   Serial.begin(9600);
   GPS.begin(9600);
-  //ESPWIFI.begin(115200);
+
+  #ifdef WLAN_ENABLED
+  ESPWIFI.begin(115200);
+  #endif
+  
   SIM.begin(115200);
+
+  #ifdef LCD_OUTPUT
 
   lcd.print("[#");
   lcd.setCursor(10, 1);
   lcd.print("]");
   lcd.setCursor(1, 1);
 
+  #endif
+
   delay(3000);
 
-  pinMode(pinInterrupt, INPUT);
-  pinMode(lcdBackLight, OUTPUT);
+  // pinMode(pinInterrupt, INPUT);
+  // pinMode(lcdBackLight, OUTPUT);
 
-  digitalWrite(lcdBackLight, HIGH);
+  // digitalWrite(lcdBackLight, HIGH);
+
+  pinMode(LedPower, OUTPUT);
+  pinMode(LedRed, OUTPUT);
+  pinMode(LedGre, OUTPUT);
+  pinMode(LedBlu, OUTPUT);
+
+  digitalWrite(LedPower, 255);
+  ledWrite(255, 255, 255);
 
   SIM.println("AT\r");
 
+  #ifdef LCD_OUTPUT
+
   lcd.print("#");
+
+  #endif
 
   Serial.print("setup begin\r\n");
-  //Serial.print("FW Version: ");
-  //Serial.println(WLAN.getVersion().c_str());
+  
+  #ifdef WLAN_ENABLED
+  Serial.print("FW Version: ");
+  Serial.println(WLAN.getVersion().c_str());
+  #endif
+
+  #ifdef LCD_OUTPUT
 
   lcd.print("#");
 
-  // if (WLAN.setOprToStation()) {
-  //   Serial.print("to station ok\r\n");
-  // } else {
-  //   Serial.print("to station err\r\n");
-  // } lcd.print("#");
-  // if (WLAN.joinAP(SSID, PASSWORD)) {
-  //   Serial.print("Join AP success\r\n");
-  //   Serial.print("IP: ");
-  //   Serial.println(WLAN.getLocalIP().c_str());
-  // } else {
-  //   Serial.print("Join AP failure\r\n");
-  // } lcd.print("#");
-  // ESPWIFI.println("AT+UART_CUR=9600,8,1,0,0");
-  // ESPWIFI.begin(9600);
+  #endif
 
-  // sim800c.ssbegin(9600);
-  // register int s=0;
-  // do {
-  //   s = sim800c.initTCP();
-  // } while (s = 0); delay(2000);
-  // sim800c.MQTTConnect(DEV_ID, DEV_PRO_ID, DEV_KEY);
+  #ifdef WLAN_ENABLED
+  if (WLAN.setOprToStation()) {
+    Serial.print("to station ok\r\n");
+  } else {
+    Serial.print("to station err\r\n");
+  } lcd.print("#");
+  if (WLAN.joinAP(SSID, PASSWORD)) {
+    Serial.print("Join AP success\r\n");
+    Serial.print("IP: ");
+    Serial.println(WLAN.getLocalIP().c_str());
+  } else {
+    Serial.print("Join AP failure\r\n");
+  } lcd.print("#");
+  ESPWIFI.println("AT+UART_CUR=9600,8,1,0,0");
+  ESPWIFI.begin(9600);
+  #endif
+
+  #ifdef SIM800C_MQTT
+  sim800c.ssbegin(9600);
+  register int s=0;
+  do {
+    s = sim800c.initTCP();
+  } while (s = 0); delay(2000);
+  sim800c.MQTTConnect(DEV_ID, DEV_PRO_ID, DEV_KEY);
+  #endif
+
+  #ifdef LCD_OUTPUT
 
   lcd.print("#");
 
-  interTimer = Timer = millis(); lcd.print("#");
+  #endif
 
-  accelgyroSetUp(); lcd.print("#");
+  interTimer = Timer = millis();
+  
+  #ifdef LCD_OUTPUT
+  lcd.print("#");
+  #endif
 
-  irrecv.enableIRIn(); lcd.print("#");
+  accelgyroSetUp();
+  
+  #ifdef LCD_OUTPUT
+  lcd.print("#");
+  #endif
+
+  irrecv.enableIRIn();
+  
+  #ifdef LCD_OUTPUT
+  lcd.print("#");
+  #endif
 
   #ifdef ACCIDENT_TEST
   accidentReport ();
   #endif
 
-  Serial.println("setup end\r\n"); lcd.print("#] OK.");
+  Serial.println("setup end\r\n");
+  
+  #ifdef LCD_OUTPUT
+  lcd.print("#] OK.");
+  #endif
+
+  ledWrite(0, 0, 0);
 
 }
 
@@ -165,16 +240,16 @@ void loop() {
 
   #endif
 
-  //Serial.println("Loop Runtime");
+  Serial.println("Loop Runtime");
 
   while (GPS.available()) {
     if (gpsData.encode(GPS.read())) {
-      
+      ledWrite(0, 0, 255);
       if (dataFetch.check())  getGpsData();
       if (dataUpdate.check()) dataUpd();
       if (accidentMonitor.check()) {
-        if (Skmph>=25.0 && isRotate()) accidentReport();
-      }
+        if (isRotate() && Skmph>=25.0) accidentReport();
+      } ledWrite(0, 0, 0);
       
       #ifdef DEBUG
       register bool flag=irrecv.decode(&results);
@@ -189,58 +264,64 @@ void loop() {
   #endif
 }
 
-// void dataUpd () {
-//   if (WLAN.createTCP(HOST_NAME, HOST_PORT)) {
-//       Serial.println("create tcp ok\r\n");
-//       char buf[10];
-//       String jsonToSend = "{\"Logitude\":";
-//       dtostrf(Logi, 1, 6, buf);
-//       jsonToSend += "\"" + String(buf) + "\"";
-//       jsonToSend += ",\"Latitude\":";
-//       dtostrf(Lati, 1, 6, buf);
-//       jsonToSend += "\"" + String(buf) + "\"";
-//       jsonToSend += ",\"Altitude\":";
-//       dtostrf(Alti, 1, 6, buf);
-//       jsonToSend += "\"" + String(buf) + "\"";
-//       jsonToSend += ",\"Speed\":";
-//       dtostrf(Skmph, 1, 2, buf);
-//       jsonToSend += "\"" + String(buf) + "\"";
-//       jsonToSend += "}";
+#ifdef WLAN_ENABLED
 
-//       String postString = "POST /devices/";
-//       postString += DEVICE_ID;
-//       postString += "/datapoints?type=3 HTTP/1.1";
-//       postString += "\r\n";
-//       postString += "api-key:";
-//       postString += APIKey;
-//       postString += "\r\n";
-//       postString += "Host:api.heclouds.com\r\n";
-//       postString += "Connection:close\r\n";
-//       postString += "Content-Length:";
-//       postString += jsonToSend.length();
-//       postString += "\r\n";
-//       postString += "\r\n";
-//       postString += jsonToSend;
-//       postString += "\r\n";
-//       postString += "\r\n";
-//       postString += "\r\n";
+void dataUpd () {
+  if (WLAN.createTCP(HOST_NAME, HOST_PORT)) {
+      Serial.println("create tcp ok\r\n");
+      char buf[10];
+      String jsonToSend = "{\"Logitude\":";
+      dtostrf(Logi, 1, 6, buf);
+      jsonToSend += "\"" + String(buf) + "\"";
+      jsonToSend += ",\"Latitude\":";
+      dtostrf(Lati, 1, 6, buf);
+      jsonToSend += "\"" + String(buf) + "\"";
+      jsonToSend += ",\"Altitude\":";
+      dtostrf(Alti, 1, 6, buf);
+      jsonToSend += "\"" + String(buf) + "\"";
+      jsonToSend += ",\"Speed\":";
+      dtostrf(Skmph, 1, 2, buf);
+      jsonToSend += "\"" + String(buf) + "\"";
+      jsonToSend += "}";
 
-//       const char *postArray = postString.c_str();
-//       Serial.println(postArray);
-//       WLAN.send((const uint8_t *)postArray, strlen(postArray));
-//       // Serial.println("send success");
-//       // if (WLAN.releaseTCP()) {
-//       //   Serial.print("release tcp ok\r\n");
-//       // } else {
-//       //   Serial.print("release tcp err\r\n");
-//       // }
-//       postArray = NULL;
-//     } else {
-//       Serial.print("create tcp err\r\n");
-//     }
-// }
+      String postString = "POST /devices/";
+      postString += DEVICE_ID;
+      postString += "/datapoints?type=3 HTTP/1.1";
+      postString += "\r\n";
+      postString += "api-key:";
+      postString += APIKey;
+      postString += "\r\n";
+      postString += "Host:api.heclouds.com\r\n";
+      postString += "Connection:close\r\n";
+      postString += "Content-Length:";
+      postString += jsonToSend.length();
+      postString += "\r\n";
+      postString += "\r\n";
+      postString += jsonToSend;
+      postString += "\r\n";
+      postString += "\r\n";
+      postString += "\r\n";
+
+      const char *postArray = postString.c_str();
+      Serial.println(postArray);
+      WLAN.send((const uint8_t *)postArray, strlen(postArray));
+      // Serial.println("send success");
+      // if (WLAN.releaseTCP()) {
+      //   Serial.print("release tcp ok\r\n");
+      // } else {
+      //   Serial.print("release tcp err\r\n");
+      // }
+      postArray = NULL;
+    } else {
+      Serial.print("create tcp err\r\n");
+    }
+}
+
+#endif
 
 inline void dataUpd () {
+  ledWrite(0, 255, 0);
+
   SIM.println("AT\r"); delay(100);
   SIM.println("AT+CGDCONT=1,\"IP\",\"CMNET\"\r"); delay(100);
   SIM.println("AT+CGATT=1"); delay(100);
@@ -288,6 +369,8 @@ inline void dataUpd () {
   SIM.write(postArray); delay(100); SIM.write(0x1A);
 
   postArray = NULL;
+
+  ledWrite(0, 0, 0);
 }
 
 void getGpsData () {
@@ -339,6 +422,8 @@ void getGpsData () {
 }
 
 void accidentReport () {
+  ledWrite(0, 255, 0);
+
   Serial.println ("Accident Report Trigged.");
   String tmp = "AT+CMGS=\""; tmp += TEL_NUM; tmp += "\"\n\r";
   char buf[10];
@@ -358,7 +443,13 @@ void accidentReport () {
 
   SIM.write(tmp.c_str());
   SIM.print("test.\n\r"); delay(1000); SIM.write(0x1A);
-  delay (10000);
+  delay (10000); ledWrite(0, 0, 0);
+}
+
+inline void ledWrite (int R, int G, int B) {
+  digitalWrite(LedRed, (255-R)>>LED_LITHT_DEC);
+  digitalWrite(LedGre, (255-G)>>LED_LITHT_DEC);
+  digitalWrite(LedBlu, (255-B)>>LED_LITHT_DEC);
 }
 
 // Kalman
@@ -453,7 +544,7 @@ inline bool isRotate () {
   register double acce = sqrt(accx*accx + accy*accy + accz*accz);
   
   flag = acce>=ACCIDENT_ACCE;
-  if (abs(agx-avgx)>ACCIDENT_ANGLE || abs(agy-avgy)>ACCIDENT_ANGLE || abs(agz-avgz)>ACCIDENT_ANGLE) flag = true;
+  if (Abs(agx-avgx)>ACCIDENT_ANGLE || Abs(agy-avgy)>ACCIDENT_ANGLE || Abs(agz-avgz)>ACCIDENT_ANGLE) flag = true;
 
   totx -= tmpAgx[pos], toty -= tmpAgy[pos], totz -= tmpAgz[pos];
   tmpAgx[pos] = agx, tmpAgy[pos]= agy, tmpAgz[pos] = agz;
@@ -483,6 +574,8 @@ void nowPosiModify (long long res) {
   }
 
   digitalWrite(lcdBackLight, HIGH);
+
+  #ifdef LCD_OUTPUT
 
   switch (ret) {
     case 0: {
@@ -520,6 +613,8 @@ void nowPosiModify (long long res) {
       break;
     }
   } rettmp = -1;
+
+  #endif
 
   #ifdef DEBUG
   //Serial.print("ret: ");
@@ -569,6 +664,6 @@ int lcd_rm_encode (long long res) {
 // double preagx, preagy, preagz;
 
 // bool check_motion() {
-//   register bool ret=abs(agx-preagx)<=5&&abs(agy-preagy)<=5&&abs(agz-preagz)<=5&&Skmph<=5;
+//   register bool ret=Abs(agx-preagx)<=5&&Abs(agy-preagy)<=5&&Abs(agz-preagz)<=5&&Skmph<=5;
 //   if (!ret) interTimer=millis(); preagx=agx; preagy=agy; preagz=agz; return ret;
 // }
