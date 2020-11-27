@@ -52,23 +52,26 @@ const int RECV_PIN = 11;
 IRrecv irrecv(RECV_PIN);
 decode_results results;
 
-#define SSID "ELLIAS"
-#define PASSWORD "Akimihomura!"
-#define TEL_NUM 15724575401
+// #define SSID "ELLIAS"
+// #define PASSWORD "Akimihomura!"
+#define TEL_NUM "+8613800100500" //accident report target tel
 #define HOST_NAME "api.heclouds.com"
+#define ACCIDENT_ACCE 2 //minnimal acceleration to trigger accident report
+#define ACCIDENT_ANGLE 90 //minnimal dip angle to trigger accident report
 #define HOST_PORT (80)
-#define DEVICE_ID "644250210"
-const String APIKey = "fhAS54e5X8HL5wcaB6ZW74oA3vo=";
+#define DEVICE_ID "644250210" //device id
+const String APIKey = "fhAS54e5X8HL5wcaB6ZW74oA3vo="; //device api-key
 
 void getGpsData();
 void dataUpd();
 void accidentReport();
 void accelgyroSetUp();
-bool rotateCheck();
+void getAcce();
+inline bool isRotate();
 int lcd_rm_encode(long long);
 void nowPosiModify(long long);
 //void gotoSleep(void);
-bool check_motion();
+//bool check_motion();
 
 #define abs(x) ((x)<0? (-x):(x))
 
@@ -170,7 +173,7 @@ void loop() {
       if (dataFetch.check())  getGpsData();
       if (dataUpdate.check()) dataUpd();
       if (accidentMonitor.check()) {
-        if (Skmph>=25.0 && rotateCheck() && abs(Acce)>=20.0) accidentReport();
+        if (Skmph>=25.0 && isRotate()) accidentReport();
       }
       
       #ifdef DEBUG
@@ -337,12 +340,24 @@ void getGpsData () {
 
 void accidentReport () {
   Serial.println ("Accident Report Trigged.");
+  String tmp = "AT+CMGS=\""; tmp += TEL_NUM; tmp += "\"\n\r";
+  char buf[10];
   SIM.begin(115200);
-  SIM.println("AT\r"); delay(100);
-  SIM.println("AT+CMGF=1\r"); delay(500);
+  SIM.println("AT\r\n"); delay(100);
+  SIM.println("AT+CMGF=1\n\r"); delay(500);
   //SIM.println("AT+CSCA=\"+8613800100500\"\r"); delay(1000);
-  SIM.println("AT+CMGS=\"+8613384009298\"\r"); delay(1000);
-  SIM.print("test.\r\n"); delay(1000); SIM.write(0x1A);
+  SIM.write(tmp.c_str()); delay(1000);
+  //SIM.println("AT+CMGS=\"+8613384009298\"\r"); delay(1000);
+  SIM.println("It seems to be an accident.\n\r");
+
+  tmp = "Location: ";
+  dtostrf(Lati, 1, 4, buf);
+  tmp += String(buf);
+  dtostrf(Logi, 1, 4, buf);
+  tmp += ", " + String(buf)+"\n\r";
+
+  SIM.write(tmp.c_str());
+  SIM.print("test.\n\r"); delay(1000); SIM.write(0x1A);
   delay (10000);
 }
 
@@ -353,6 +368,7 @@ double dt;
 
 int16_t ax, ay, az, gx, gy, gz;
 double aax=0, aay=0,aaz=0, agx=0, agy=0, agz=0;
+double accx, accy, accz;
 long axo = 0, ayo = 0, azo = 0, gxo = 0, gyo = 0, gzo = 0;
 
 double pi = 3.1415926, AcceRatio = 16384.0, GyroRatio = 131.0;
@@ -373,14 +389,14 @@ void accelgyroSetUp () {
   } axo /= times, ayo /= times, azo /= times, gxo /= times, gyo /= times, gzo /= times;
 }
 
-bool rotateCheck () {
+void getAcce () {
   unsigned long now = millis();
   dt = (now - lastTime) / 1000.0;
   lastTime = now;
 
   accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
 
-  double accx = ax / AcceRatio, accy = ay / AcceRatio, accz = az / AcceRatio;
+  accx = ax / AcceRatio, accy = ay / AcceRatio, accz = az / AcceRatio;
 
   aax = atan(accy / accz) * (-180) / pi;
   aay = atan(accx / accz) * 180 / pi;
@@ -425,8 +441,27 @@ bool rotateCheck () {
   Serial.println();
 
   #endif
+}
 
-  return false;
+const int durVal = 30;
+double tmpAgx[durVal], tmpAgy[durVal], tmpAgz[durVal];
+int pos, totx, toty, totz;
+double avgx, avgy, avgz;
+
+inline bool isRotate () {
+  getAcce(); register bool flag = false;
+  register double acce = sqrt(accx*accx + accy*accy + accz*accz);
+  
+  flag = acce>=ACCIDENT_ACCE;
+  if (abs(agx-avgx)>ACCIDENT_ANGLE || abs(agy-avgy)>ACCIDENT_ANGLE || abs(agz-avgz)>ACCIDENT_ANGLE) flag = true;
+
+  totx -= tmpAgx[pos], toty -= tmpAgy[pos], totz -= tmpAgz[pos];
+  tmpAgx[pos] = agx, tmpAgy[pos]= agy, tmpAgz[pos] = agz;
+  totx += agx, toty += agy, totz += agz;
+  avgx = 1.0*totx/(1.0*durVal), avgy = 1.0*toty/(1.0*durVal), avgz = 1.0*totz/(1.0*durVal);
+  pos = (pos+1)%durVal;
+
+  return flag;
 }
 
 int ret, rettmp=-1;
@@ -531,9 +566,9 @@ int lcd_rm_encode (long long res) {
 //   sleep_enable(); sleep_mode(); sleep_disable();
 // }
 
-double preagx, preagy, preagz;
+// double preagx, preagy, preagz;
 
-bool check_motion() {
-  register bool ret=abs(agx-preagx)<=5&&abs(agy-preagy)<=5&&abs(agz-preagz)<=5&&Skmph<=5;
-  if (!ret) interTimer=millis(); preagx=agx; preagy=agy; preagz=agz; return ret;
-}
+// bool check_motion() {
+//   register bool ret=abs(agx-preagx)<=5&&abs(agy-preagy)<=5&&abs(agz-preagz)<=5&&Skmph<=5;
+//   if (!ret) interTimer=millis(); preagx=agx; preagy=agy; preagz=agz; return ret;
+// }
