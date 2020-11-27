@@ -306,12 +306,12 @@ void dataUpd () {
       const char *postArray = postString.c_str();
       Serial.println(postArray);
       WLAN.send((const uint8_t *)postArray, strlen(postArray));
-      // Serial.println("send success");
-      // if (WLAN.releaseTCP()) {
-      //   Serial.print("release tcp ok\r\n");
-      // } else {
-      //   Serial.print("release tcp err\r\n");
-      // }
+      Serial.println("send success");
+      if (WLAN.releaseTCP()) {
+        Serial.print("release tcp ok\r\n");
+      } else {
+        Serial.print("release tcp err\r\n");
+      }
       postArray = NULL;
     } else {
       Serial.print("create tcp err\r\n");
