@@ -67,7 +67,7 @@ void accelgyroSetUp();
 bool rotateCheck();
 int lcd_rm_encode(long long);
 void nowPosiModify(long long);
-void gotoSleep(void);
+//void gotoSleep(void);
 bool check_motion();
 
 #define abs(x) ((x)<0? (-x):(x))
@@ -87,7 +87,7 @@ void setup() {
   Serial.begin(9600);
   GPS.begin(9600);
   //ESPWIFI.begin(115200);
-  SIM.begin(19200);
+  SIM.begin(115200);
 
   lcd.print("[#");
   lcd.setCursor(10, 1);
@@ -101,7 +101,7 @@ void setup() {
 
   digitalWrite(lcdBackLight, HIGH);
 
-  SIM.println("AT");
+  SIM.println("AT\r");
 
   lcd.print("#");
 
@@ -237,14 +237,14 @@ void loop() {
 //     }
 // }
 
-void dataUpd () {
+inline void dataUpd () {
   SIM.println("AT\r"); delay(100);
   SIM.println("AT+CGDCONT=1,\"IP\",\"CMNET\"\r"); delay(100);
   SIM.println("AT+CGATT=1"); delay(100);
   SIM.println("AT+CIPCSGP=1,\"CMNET\"\r"); delay(100);
-  SIM.println("AT+CLPORT=\"TCP\",\"2000\"\r"); delay(100);
+  SIM.println("AT+CLPORT=\"TCP\",\"2000\"\r"); delay(500);
   SIM.println("AT+CIPSTART=\"TCP\",\"183.230.40.33\",\"80\"\r");
-  delay(100); SIM.println("AT+CIPSEND"); delay(100);
+  delay(500); SIM.println("AT+CIPSEND"); delay(100);
   
   char buf[10];
   String jsonToSend = "{\"Logitude\":";
@@ -338,8 +338,8 @@ void getGpsData () {
 void accidentReport () {
   Serial.println ("Accident Report Trigged.");
   SIM.begin(115200);
-  SIM.println("AT\r"); delay(1000);
-  SIM.println("AT+CMGF=1\r"); delay(1000);
+  SIM.println("AT\r"); delay(100);
+  SIM.println("AT+CMGF=1\r"); delay(500);
   //SIM.println("AT+CSCA=\"+8613800100500\"\r"); delay(1000);
   SIM.println("AT+CMGS=\"+8613384009298\"\r"); delay(1000);
   SIM.print("test.\r\n"); delay(1000); SIM.write(0x1A);
