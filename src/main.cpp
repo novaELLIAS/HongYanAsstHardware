@@ -19,7 +19,7 @@
 //#include "sim800c_onenet.h"
 
 //#define IRDEBUG
-#define DEBUG
+//#define DEBUG
 //#define LCD_OUTPUT
 //#define INTERRUPT_ENABLED
 //#define ACCELGYRO_SERIAL_OUTPUT
@@ -73,6 +73,7 @@ decode_results results;
 #define HOST_NAME "api.heclouds.com"
 #define ACCIDENT_ACCE 2 //minnimal acceleration to trigger accident report
 #define ACCIDENT_ANGLE 90 //minnimal dip angle to trigger accident report
+#define ACCIDENT_ALERT_SPEED 25
 #define HOST_PORT (80)
 #define DEVICE_ID "644250210" //device id
 const String APIKey = "fhAS54e5X8HL5wcaB6ZW74oA3vo="; //device api-key
@@ -248,7 +249,7 @@ void loop() {
       if (dataFetch.check())  getGpsData();
       if (dataUpdate.check()) dataUpd();
       if (accidentMonitor.check()) {
-        if (isRotate() && Skmph>=25.0) accidentReport();
+        if (isRotate() && Skmph>=ACCIDENT_ALERT_SPEED) accidentReport();
       } ledWrite(0, 0, 0);
       
       #ifdef DEBUG
