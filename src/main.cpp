@@ -69,7 +69,6 @@ decode_results results;
 
 #define SSID "ELLIAS"
 #define PASSWORD "Akimihomura!"
-#define TEL_NUM "+8613800100500" //accident report target tel
 #define HOST_NAME "api.heclouds.com"
 #define ACCIDENT_ACCE 2 //minnimal acceleration to trigger accident report
 #define ACCIDENT_ANGLE 90 //minnimal dip angle to trigger accident report
@@ -77,6 +76,7 @@ decode_results results;
 #define HOST_PORT (80)
 #define DEVICE_ID "644250210" //device id
 const String APIKey = "fhAS54e5X8HL5wcaB6ZW74oA3vo="; //device api-key
+const String TEL_NUM = "+8613384009298"; //accident report target tel
 
 inline void ledWrite(int, int, int);
 void getGpsData();
@@ -93,7 +93,7 @@ void nowPosiModify(long long);
 template <typename T>
 inline T Abs(T x) {return (x)<0? (-x):(x);}
 
-double Lati, Logi, Alti, Skmph, Smps, Acce, timeDelta;
+double Lati = 65.432, Logi = 65.432, Alti, Skmph, Smps, Acce, timeDelta;
 int Year, Month, Day, Hour, Minute, Second, Timer;
 long long interTimer;
 
@@ -215,6 +215,7 @@ void setup() {
   #endif
 
   #ifdef ACCIDENT_TEST
+  delay(10000);
   accidentReport ();
   #endif
 
@@ -241,7 +242,7 @@ void loop() {
 
   #endif
 
-  Serial.println("Loop Runtime");
+  //Serial.println("Loop Runtime");
 
   while (GPS.available()) {
     if (gpsData.encode(GPS.read())) {
@@ -423,28 +424,35 @@ void getGpsData () {
 }
 
 void accidentReport () {
-  ledWrite(0, 255, 0);
+  ledWrite(0, 0, 0);
+  ledWrite(255, 0, 0);
 
   Serial.println ("Accident Report Trigged.");
+
+  SIM.println("AT+CIPCLOSE\r"); delay(1000);
+  SIM.println("AT+CIPSTART\r"); delay(5000);
+
   String tmp = "AT+CMGS=\""; tmp += TEL_NUM; tmp += "\"\n\r";
+  Serial.println(tmp);
   char buf[10];
   SIM.begin(115200);
   SIM.println("AT\r\n"); delay(100);
   SIM.println("AT+CMGF=1\n\r"); delay(500);
-  //SIM.println("AT+CSCA=\"+8613800100500\"\r"); delay(1000);
   SIM.write(tmp.c_str()); delay(1000);
-  //SIM.println("AT+CMGS=\"+8613384009298\"\r"); delay(1000);
-  SIM.println("It seems to be an accident.\n\r");
+  SIM.println("It seems to be an accident.");
 
   tmp = "Location: ";
   dtostrf(Lati, 1, 4, buf);
   tmp += String(buf);
   dtostrf(Logi, 1, 4, buf);
-  tmp += ", " + String(buf)+"\n\r";
+  tmp += ", " + String(buf)+"\r";
 
   SIM.write(tmp.c_str());
-  SIM.print("test.\n\r"); delay(1000); SIM.write(0x1A);
+  delay(1000); SIM.write(0x1A);
   delay (10000); ledWrite(0, 0, 0);
+
+  SIM.println("AT+CIPCLOSE\r"); delay(1000);
+  SIM.println("AT+CIPSTART\r"); delay(5000);
 }
 
 inline void ledWrite (int R, int G, int B) {
