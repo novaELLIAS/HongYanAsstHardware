@@ -73,10 +73,10 @@ decode_results results;
 #define ACCIDENT_ACCE 2 //minnimal acceleration to trigger accident report
 #define ACCIDENT_ANGLE 90 //minnimal dip angle to trigger accident report
 #define ACCIDENT_ALERT_SPEED 25
-#define HOST_PORT (80)
 #define DEVICE_ID "644250210" //device id
 const String APIKey = "fhAS54e5X8HL5wcaB6ZW74oA3vo="; //device api-key
 const String TEL_NUM = "+8613384009298"; //accident report target tel
+#define HOST_PORT (80)
 
 inline void ledWrite(int, int, int);
 void getGpsData();
@@ -152,6 +152,7 @@ void setup() {
   #endif
 
   Serial.print("setup begin\r\n");
+  delay(20000);
   
   #ifdef WLAN_ENABLED
   Serial.print("FW Version: ");
