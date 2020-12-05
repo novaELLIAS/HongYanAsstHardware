@@ -34,10 +34,10 @@
 #define SIM Serial2
 #define ESPWIFI ESPSOFT
 
-#define LedPower 2
-#define LedRed 3
-#define LedGre 4
-#define LedBlu 5
+#define LedPower 5
+#define LedRed 2
+#define LedGre 3
+#define LedBlu 4
 #define LED_LITHT_DEC 4
 
 // defineTask(dataFetch);
@@ -93,7 +93,7 @@ void nowPosiModify(long long);
 template <typename T>
 inline T Abs(T x) {return (x)<0? (-x):(x);}
 
-double Lati = 65.432, Logi = 65.432, Alti, Skmph, Smps, Acce, timeDelta;
+double Lati, Logi, Alti, Skmph, Smps, Acce, timeDelta;
 int Year, Month, Day, Hour, Minute, Second, Timer;
 long long interTimer;
 
@@ -152,7 +152,7 @@ void setup() {
   #endif
 
   Serial.print("setup begin\r\n");
-  delay(20000);
+  delay(2000);
   
   #ifdef WLAN_ENABLED
   Serial.print("FW Version: ");
@@ -244,16 +244,20 @@ void loop() {
   #endif
 
   //Serial.println("Loop Runtime");
-
-  while (GPS.available()) {
+  //while(true) {
+  if (GPS.available()) {
     if (gpsData.encode(GPS.read())) {
+    //if (true) {
       ledWrite(0, 0, 255);
       if (dataFetch.check())  getGpsData();
-      if (dataUpdate.check()) dataUpd();
-      if (accidentMonitor.check()) {
-        if (isRotate() && Skmph>=ACCIDENT_ALERT_SPEED) accidentReport();
-      } ledWrite(0, 0, 0);
+      ledWrite(0, 0, 0);
       
+      if (dataUpdate.check() && (Abs(Lati)>=1e-4 || Abs(Logi)>=1e-4)) dataUpd();
+      if (accidentMonitor.check()) {
+        register bool flag = isRotate();
+        if (flag && Skmph>=ACCIDENT_ALERT_SPEED) accidentReport();
+      }
+
       #ifdef DEBUG
       register bool flag=irrecv.decode(&results);
       nowPosiModify(results.value);
@@ -261,6 +265,9 @@ void loop() {
       #endif
     }
   }
+
+  
+  
 
   #ifdef INTERRUPT_ENABLED
   if (millis()-interTimer>=10000 && check_motion()) gotoSleep();
@@ -406,8 +413,8 @@ void getGpsData () {
 
   #endif
 
-  Acce = (gpsData.speed.mps() - Smps) / (timeDelta=((double)(millis()-Timer)/1000.0));
-  Timer = millis();
+  //Acce = (gpsData.speed.mps() - Smps) / (timeDelta=((double)(millis()-Timer)/1000.0));
+  //Timer = millis();
 
   Skmph = gpsData.speed.kmph();
   Smps  = gpsData.speed.mps();
@@ -498,7 +505,11 @@ void getAcce () {
   accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
 
   accx = ax / AcceRatio, accy = ay / AcceRatio, accz = az / AcceRatio;
-
+  Acce = sqrt(accx*accx + accy*accy + accz*accz);
+  
+  Serial.print  (" Acce upd: ");
+  Serial.println(Acce, 10);
+  
   aax = atan(accy / accz) * (-180) / pi;
   aay = atan(accx / accz) * 180 / pi;
   aaz = atan(accz / accy) * 180 / pi;
@@ -544,23 +555,24 @@ void getAcce () {
   #endif
 }
 
-const int durVal = 30;
+const int durVal = 50;
 double tmpAgx[durVal], tmpAgy[durVal], tmpAgz[durVal];
 int pos, totx, toty, totz;
 double avgx, avgy, avgz;
 
 inline bool isRotate () {
   getAcce(); register bool flag = false;
-  register double acce = sqrt(accx*accx + accy*accy + accz*accz);
   
-  flag = acce>=ACCIDENT_ACCE;
+  flag = Acce>=ACCIDENT_ACCE;
   if (Abs(agx-avgx)>ACCIDENT_ANGLE || Abs(agy-avgy)>ACCIDENT_ANGLE || Abs(agz-avgz)>ACCIDENT_ANGLE) flag = true;
 
   totx -= tmpAgx[pos], toty -= tmpAgy[pos], totz -= tmpAgz[pos];
   tmpAgx[pos] = agx, tmpAgy[pos]= agy, tmpAgz[pos] = agz;
   totx += agx, toty += agy, totz += agz;
   avgx = 1.0*totx/(1.0*durVal), avgy = 1.0*toty/(1.0*durVal), avgz = 1.0*totz/(1.0*durVal);
-  pos = (pos+1)%durVal;
+  pos = (pos+1)%(durVal);
+
+  //Serial.print("position: "); Serial.println (pos);
 
   return flag;
 }
