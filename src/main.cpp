@@ -30,14 +30,14 @@
 #define pinInterrupt 2
 #define lcdBackLight 28
 
-#define GPS Serial1
-#define SIM Serial2
+#define GPS Serial2
+#define SIM Serial1
 #define ESPWIFI ESPSOFT
 
 #define LedPower 5
-#define LedRed 2
+#define LedRed 4
 #define LedGre 3
-#define LedBlu 4
+#define LedBlu 2
 #define LED_LITHT_DEC 4
 
 // defineTask(dataFetch);
@@ -413,8 +413,8 @@ void getGpsData () {
 
   #endif
 
-  //Acce = (gpsData.speed.mps() - Smps) / (timeDelta=((double)(millis()-Timer)/1000.0));
-  //Timer = millis();
+  Acce = Abs((gpsData.speed.mps() - Smps) / (timeDelta=((double)(millis()-Timer)/1000.0)));
+  Timer = millis();
 
   Skmph = gpsData.speed.kmph();
   Smps  = gpsData.speed.mps();
@@ -505,10 +505,13 @@ void getAcce () {
   accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
 
   accx = ax / AcceRatio, accy = ay / AcceRatio, accz = az / AcceRatio;
-  Acce = sqrt(accx*accx + accy*accy + accz*accz);
+  // Acce = sqrt(accx*accx + accy*accy + accz*accz);
   
-  Serial.print  (" Acce upd: ");
-  Serial.println(Acce, 10);
+  // Serial.print  (" Acce upd: "); 
+  // Serial.print(accx, 3); Serial.print(" ");
+  // Serial.print(accy, 3); Serial.print(" ");
+  // Serial.print(accz, 3); Serial.print(" ");
+  // Serial.println(Acce, 10);
   
   aax = atan(accy / accz) * (-180) / pi;
   aay = atan(accx / accz) * 180 / pi;
