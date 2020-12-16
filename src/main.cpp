@@ -1,5 +1,5 @@
 /*
-* Ellias K Stuart
+* Ellias Kiri Stuart
 */
 
 #include <Arduino.h>
@@ -25,6 +25,7 @@
 //#define ACCELGYRO_SERIAL_OUTPUT
 //#define ACCIDENT_TEST
 #define GPS_SERIAL_OUTPUT
+//#define GPS_GET_TIME
 //#define WLAN_ENABLED
 
 #define pinInterrupt 2
@@ -266,9 +267,6 @@ void loop() {
     }
   }
 
-  
-  
-
   #ifdef INTERRUPT_ENABLED
   if (millis()-interTimer>=10000 && check_motion()) gotoSleep();
   #endif
@@ -384,6 +382,9 @@ inline void dataUpd () {
 }
 
 void getGpsData () {
+
+  #ifdef GPS_GET_TIME
+
   Year   = gpsData.date.year();
   Month  = gpsData.date.month();
   Day    = gpsData.date.day();
@@ -391,10 +392,16 @@ void getGpsData () {
   Minute = gpsData.time.minute();
   Second = gpsData.time.second();
 
+  #endif
+
   #ifdef GPS_SERIAL_OUTPUT
+
+  #ifdef GPS_GET_TIME
 
   sprintf(sout, "Date: %d/%d/%d %d:%d:%d\n", Year, Month, Day, Hour, Minute, Second);
   //Serial.print (sout);
+
+  #endif
   
   #endif
 
@@ -558,7 +565,7 @@ void getAcce () {
   #endif
 }
 
-const int durVal = 50;
+const int durVal = 150;
 double tmpAgx[durVal], tmpAgy[durVal], tmpAgz[durVal];
 int pos, totx, toty, totz;
 double avgx, avgy, avgz;
