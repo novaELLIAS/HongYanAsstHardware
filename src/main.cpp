@@ -131,10 +131,14 @@ void setup() {
 
   delay(3000);
 
-  // pinMode(pinInterrupt, INPUT);
-  // pinMode(lcdBackLight, OUTPUT);
+  #ifdef LCD_OUTPUT
 
-  // digitalWrite(lcdBackLight, HIGH);
+  pinMode(pinInterrupt, INPUT);
+  pinMode(lcdBackLight, OUTPUT);
+
+  digitalWrite(lcdBackLight, HIGH);
+
+  #endif
 
   pinMode(LedPower, OUTPUT);
   pinMode(LedRed, OUTPUT);
